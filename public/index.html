@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
   input[type=number]::-webkit-inner-spin-button,
@@ -443,6 +444,7 @@ var firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 var fbAuth = firebase.auth();
+var db     = firebase.firestore();
 
 var ALLOWED_DOMAINS = ['simprogroup.com','simpro.us','simpro.au','simpro.nz','bigchange.com','clockshark.com'];
 
@@ -459,7 +461,7 @@ function doGoogleSignIn() {
       err.classList.remove('hidden');
       return;
     }
-    doLogin(user.email, user.displayName || user.email.split('@')[0]);
+    doLogin(user.email, user.displayName || user.email.split('@')[0], user.uid);
   }).catch(function(e) {
     if (e.code !== 'auth/popup-closed-by-user') {
       var err = document.getElementById('loginErr');
@@ -522,6 +524,55 @@ function getAllProfiles()    {
   return ids.map(function(id) { return getProfile(id); }).filter(function(p) { return p && p.onboarded; });
 }
 
+// ── Firestore helpers (Google SSO path) ───────────────────────────────────
+
+function fsGetProfile(firebaseUid, callback) {
+  db.collection('users').doc(firebaseUid).get()
+    .then(function(doc) { callback(doc.exists ? doc.data() : null); })
+    .catch(function()   { callback(null); });
+}
+
+function fsSetProfile(firebaseUid, data) {
+  return db.collection('users').doc(firebaseUid).set(data);
+}
+
+function fsGetPool(firebaseUid, q, callback) {
+  db.collection('aePools').doc(firebaseUid + '_' + q).get()
+    .then(function(doc) { callback(doc.exists ? doc.data().aes : null); })
+    .catch(function()   { callback(null); });
+}
+
+function fsSetPool(firebaseUid, q, aesArray) {
+  return db.collection('aePools').doc(firebaseUid + '_' + q).set({
+    seUid: firebaseUid,
+    quarter: q,
+    aes: aesArray
+  });
+}
+
+function fsGetAllProfiles(callback) {
+  db.collection('users').where('onboarded', '==', true).get()
+    .then(function(snapshot) {
+      var profiles = [];
+      snapshot.forEach(function(doc) { profiles.push(doc.data()); });
+      callback(profiles);
+    })
+    .catch(function() { callback([]); });
+}
+
+function fsGetPoolsForQuarter(q, callback) {
+  db.collection('aePools').where('quarter', '==', q).get()
+    .then(function(snapshot) {
+      var pools = {};
+      snapshot.forEach(function(doc) {
+        var d = doc.data();
+        pools[d.seUid] = d.aes || [];
+      });
+      callback(pools);
+    })
+    .catch(function() { callback({}); });
+}
+
 // ── Helpers ────────────────────────────────────────────
 function uid(email) {
   var h = 0, i, c;
@@ -569,42 +620,61 @@ function showToast() {
 }
 
 // ── LOGIN ──────────────────────────────────────────────
-function doLogin(email, name) {
+function doLogin(email, name, firebaseUid) {
   if (!email || !name) {
     document.getElementById('loginErr').classList.remove('hidden');
     return;
   }
   document.getElementById('loginErr').classList.add('hidden');
-  currentUser = { uid: uid(email), email: email, name: name };
-  var p = getProfile(currentUser.uid);
-  if (!p || !p.onboarded) {
-    document.getElementById('obName').value = name;
-    showPage('pgOnboard');
+  currentUser = { uid: uid(email), email: email, name: name, firebaseUid: firebaseUid || null };
+
+  if (firebaseUid) {
+    fsGetProfile(firebaseUid, function(p) {
+      if (!p || !p.onboarded) {
+        document.getElementById('obName').value = name;
+        showPage('pgOnboard');
+      } else {
+        profile = p;
+        loadPool(function() {
+          buildDashboard();
+          showPage('pgApp');
+        });
+      }
+    });
   } else {
-    profile = p;
-    loadPool();
-    buildDashboard();
-    showPage('pgApp');
+    var p = getProfile(currentUser.uid);
+    if (!p || !p.onboarded) {
+      document.getElementById('obName').value = name;
+      showPage('pgOnboard');
+    } else {
+      profile = p;
+      loadPool(function() {
+        buildDashboard();
+        showPage('pgApp');
+      });
+    }
   }
 }
 
-// On load: auto-login if this browser already has a saved profile
+// On load: restore session via Firebase Auth state
 window.onload = function() {
-  var email = document.getElementById('inEmail').value.trim();
-  var name  = document.getElementById('inName').value.trim();
-  var savedUid = uid(email);
-  var p = getProfile(savedUid);
-  if (p && p.onboarded) {
-    // Returning user — skip login form
-    doLogin(email, name);
-  }
-  // Otherwise stay on login page and wait for button click
+  fbAuth.onAuthStateChanged(function(user) {
+    if (user) {
+      var domain = user.email.split('@')[1] || '';
+      if (ALLOWED_DOMAINS.indexOf(domain) !== -1) {
+        doLogin(user.email, user.displayName || user.email.split('@')[0], user.uid);
+      } else {
+        fbAuth.signOut();
+      }
+    }
+  });
 };
 
 function doSignOut() {
   currentUser = null;
   profile = null;
   pool = [];
+  fbAuth.signOut();
   showPage('pgLogin');
 }
 
@@ -672,29 +742,50 @@ function obFinish() {
     onboarded: true,
     isAdmin: ADMIN_EMAILS.indexOf(currentUser.email) !== -1
   };
-  setProfile(currentUser.uid, profile);
-  loadPool();
-  buildDashboard();
-  showPage('pgApp');
+  if (currentUser.firebaseUid) {
+    profile.firebaseUid = currentUser.firebaseUid;
+    fsSetProfile(currentUser.firebaseUid, profile).then(function() {
+      loadPool(function() { buildDashboard(); showPage('pgApp'); });
+    }).catch(function(e) {
+      console.error('Firestore profile write failed, falling back', e);
+      setProfile(currentUser.uid, profile);
+      loadPool(function() { buildDashboard(); showPage('pgApp'); });
+    });
+  } else {
+    setProfile(currentUser.uid, profile);
+    loadPool(function() { buildDashboard(); showPage('pgApp'); });
+  }
 }
 
 // ── POOL ───────────────────────────────────────────────
-function loadPool() {
+function loadPool(callback) {
   var q = document.getElementById('qSel').value;
-  var saved = getPool(currentUser.uid, q);
-  if (saved) {
-    pool = saved;
+  callback = callback || function() {};
+
+  if (currentUser && currentUser.firebaseUid) {
+    fsGetPool(currentUser.firebaseUid, q, function(saved) {
+      pool = saved || ((profile.region === 'UK' || profile.region === 'BigChange')
+        ? JSON.parse(JSON.stringify(DEFAULT_UK_AES))
+        : []);
+      callback();
+    });
   } else {
-    pool = (profile.region === 'UK' || profile.region === 'BigChange')
+    var saved = getPool(currentUser.uid, q);
+    pool = saved || ((profile.region === 'UK' || profile.region === 'BigChange')
       ? JSON.parse(JSON.stringify(DEFAULT_UK_AES))
-      : [];
+      : []);
+    callback();
   }
 }
 
 function savePool() {
   var q = document.getElementById('qSel').value;
-  setPool(currentUser.uid, q, pool);
-  showToast();
+  if (currentUser && currentUser.firebaseUid) {
+    fsSetPool(currentUser.firebaseUid, q, pool).then(showToast);
+  } else {
+    setPool(currentUser.uid, q, pool);
+    showToast();
+  }
 }
 
 function scheduleSave() {
@@ -707,7 +798,11 @@ function scheduleSave() {
     profile.fx           = parseFloat(document.getElementById('fxRate').value) || 1.0;
     var q = document.getElementById('qSel').value;
     profile.quotas[q]    = parseFloat(document.getElementById('seQuota').value) || 0;
-    setProfile(currentUser.uid, profile);
+    if (currentUser && currentUser.firebaseUid) {
+      fsSetProfile(currentUser.firebaseUid, profile);
+    } else {
+      setProfile(currentUser.uid, profile);
+    }
     document.getElementById('saveInd').textContent = '';
   }, 800);
 }
@@ -1108,8 +1203,9 @@ function onOTEChange() {
 }
 
 function onQChange() {
-  loadPool();
-  buildDashboard();
+  loadPool(function() {
+    buildDashboard();
+  });
 }
 
 function showTab(t) {
@@ -1138,34 +1234,66 @@ function buildAdminView() {
   var grid  = document.getElementById('adminGrid');
   var empty = document.getElementById('adminEmpty');
   var q     = document.getElementById('qSel').value;
-  var all   = getAllProfiles();
-  if (!all.length) { grid.innerHTML = ''; empty.classList.remove('hidden'); return; }
+
+  while (grid.firstChild) grid.removeChild(grid.firstChild);
+  var loading = ctxt('div', 'text-slate-400 text-sm', 'Loading team data…');
+  grid.appendChild(loading);
   empty.classList.add('hidden');
-  grid.innerHTML = '';
-  all.forEach(function(p) {
-    var sePool = getPool(p.uid, q) || [];
-    var totCW = 0;
-    sePool.forEach(function(ae) { totCW += ae.cw || 0; });
-    var poolUSD = totCW * (p.fx || 1.0);
-    var quota   = p.quotas ? (p.quotas[q] || QUARTERS[q].quota) : QUARTERS[q].quota;
-    var ote     = p.quarterlyOTE || 0;
-    var res     = payout(poolUSD, quota, ote);
-    var attPct  = (res.att * 100).toFixed(1);
-    var badge   = res.att >= 1   ? ['bg-green-100 text-green-700', 'Quota Hit ✓']
-                : res.att >= 0.6 ? ['bg-amber-100 text-amber-700', 'Qualified ✓']
-                :                  ['bg-red-100 text-red-700',      'Below Floor'];
-    var card = document.createElement('div');
-    card.className = 'bg-white rounded-xl shadow-sm border border-slate-200 p-4';
-    card.innerHTML = '<div class="flex items-start justify-between mb-3">'
-      + '<div><div class="font-semibold text-slate-800">' + (p.displayName || p.email) + '</div>'
-      + '<div class="text-xs text-slate-400 mt-0.5">' + (p.region || '—') + ' · ' + p.email + '</div></div>'
-      + '<span class="text-xs font-semibold px-2 py-1 rounded-full ' + badge[0] + '">' + badge[1] + '</span></div>'
-      + '<div class="space-y-2">'
-      + '<div class="flex justify-between text-sm"><span class="text-slate-500">Attainment</span><span class="font-bold">' + attPct + '%</span></div>'
-      + '<div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full rounded-full ' + barColor(res.att) + '" style="width:' + Math.min(res.att*100,100) + '%"></div></div>'
-      + '<div class="flex justify-between text-xs text-slate-500"><span>' + fmt(poolUSD) + ' / ' + fmt(quota) + '</span><span class="font-semibold">Est: ' + fmt(res.pay) + '</span></div>'
-      + '</div>';
-    grid.appendChild(card);
+
+  if (!profile || !profile.isAdmin) {
+    while (grid.firstChild) grid.removeChild(grid.firstChild);
+    empty.classList.remove('hidden');
+    return;
+  }
+
+  fsGetAllProfiles(function(profiles) {
+    fsGetPoolsForQuarter(q, function(pools) {
+      while (grid.firstChild) grid.removeChild(grid.firstChild);
+      if (!profiles.length) { empty.classList.remove('hidden'); return; }
+
+      profiles.forEach(function(p) {
+        var sePool = pools[p.firebaseUid] || [];
+        var totCW  = 0;
+        sePool.forEach(function(ae) { totCW += ae.cw || 0; });
+        var poolUSD = totCW * (p.fx || 1.0);
+        var quota   = p.quotas ? (p.quotas[q] || QUARTERS[q].quota) : QUARTERS[q].quota;
+        var ote     = p.quarterlyOTE || 0;
+        var res     = payout(poolUSD, quota, ote);
+        var attPct  = (res.att * 100).toFixed(1);
+        var badge   = res.att >= 1   ? ['bg-green-100 text-green-700', 'Quota Hit \u2713']
+                    : res.att >= 0.6 ? ['bg-amber-100 text-amber-700', 'Qualified \u2713']
+                    :                  ['bg-red-100 text-red-700',      'Below Floor'];
+
+        var card = cel('div', 'bg-white rounded-xl shadow-sm border border-slate-200 p-4');
+
+        var headerRow = cel('div', 'flex items-start justify-between mb-3');
+        var nameDiv   = ctxt('div', 'font-semibold text-slate-800', p.displayName || p.email);
+        var metaDiv   = ctxt('div', 'text-xs text-slate-400 mt-0.5', (p.region || '\u2014') + ' \u00b7 ' + p.email);
+        var infoWrap  = cel('div');
+        app(infoWrap, nameDiv, metaDiv);
+        var badgeEl   = ctxt('span', 'text-xs font-semibold px-2 py-1 rounded-full ' + badge[0], badge[1]);
+        app(headerRow, infoWrap, badgeEl);
+
+        var attRow    = cel('div', 'flex justify-between text-sm');
+        app(attRow, ctxt('span', 'text-slate-500', 'Attainment'), ctxt('span', 'font-bold', attPct + '%'));
+
+        var barOuter  = cel('div', 'h-2 bg-slate-100 rounded-full overflow-hidden');
+        var barInner  = cel('div', 'h-full rounded-full ' + barColor(res.att));
+        barInner.style.width = Math.min(res.att * 100, 100) + '%';
+        barOuter.appendChild(barInner);
+
+        var footRow   = cel('div', 'flex justify-between text-xs text-slate-500');
+        app(footRow,
+          ctxt('span', '', fmt(poolUSD) + ' / ' + fmt(quota)),
+          ctxt('span', 'font-semibold', 'Est: ' + fmt(res.pay)));
+
+        var statsWrap = cel('div', 'space-y-2');
+        app(statsWrap, attRow, barOuter, footRow);
+
+        app(card, headerRow, statsWrap);
+        grid.appendChild(card);
+      });
+    });
   });
 }
 
