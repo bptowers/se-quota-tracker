@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "aePools",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "seUid", "order": "ASCENDING" },
+        { "fieldPath": "quarter", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "region", "order": "ASCENDING" },
+        { "fieldPath": "displayName", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

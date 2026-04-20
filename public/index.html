@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SE Quota Tracker</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  input[type=number] { -moz-appearance: textfield; }
+  .input-cell { background:#eff6ff; border:1px solid #93c5fd; }
+  .input-cell:focus { background:#dbeafe; outline:none; border-color:#3b82f6; box-shadow:0 0 0 2px #bfdbfe; }
+  tr.ae-hover:hover td { background:#f8fafc; }
+  .fade { animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  .spinner { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+<!-- ═══ LOGIN ═══ -->
+<div id="pgLogin" style="display:block" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-700">
+  <div class="bg-white rounded-2xl shadow-2xl p-10 w-full max-w-md text-center fade">
+    <div class="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto mb-5">SE</div>
+    <h1 class="text-2xl font-bold text-slate-800 mb-1">SE Quota Tracker</h1>
+    <p class="text-slate-500 text-sm mb-8">Simpro Group · Real-time commission dashboard</p>
+    <!-- Google SSO button -->
+    <button onclick="doGoogleSignIn()"
+      class="w-full flex items-center justify-center gap-3 border border-slate-200 rounded-xl px-5 py-3.5 text-slate-700 font-medium hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm mb-4">
+      <svg class="w-5 h-5" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Sign in with Google
+    </button>
+
+    <!-- Divider -->
+    <div class="flex items-center gap-3 mb-4">
+      <div class="flex-1 h-px bg-slate-200"></div>
+      <span class="text-xs text-slate-400">or enter manually</span>
+      <div class="flex-1 h-px bg-slate-200"></div>
+    </div>
+
+    <!-- Manual fallback -->
+    <input id="inEmail" type="email" placeholder="your@email.com"
+      class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+    <input id="inName" type="text" placeholder="Your full name"
+      class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+    <button onclick="doLogin(document.getElementById('inEmail').value.trim(), document.getElementById('inName').value.trim())"
+      class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl px-5 py-3.5 transition-all">
+      Continue →
+    </button>
+    <p id="loginErr" class="text-red-500 text-xs mt-3 hidden"></p>
+    <p class="text-xs text-slate-400 mt-4">Access restricted to Simpro Group accounts</p>
+  </div>
+</div>
+
+<!-- ═══ ONBOARDING ═══ -->
+<div id="pgOnboard" style="display:none" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-700">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg fade">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm">SE</div>
+      <div>
+        <div class="font-bold text-slate-800">Set up your comp plan</div>
+        <div class="text-xs text-slate-400">Step <span id="obStep">1</span> of 3</div>
+      </div>
+    </div>
+
+    <!-- Step 1 -->
+    <div id="obS1">
+      <label class="block text-sm font-medium text-slate-700 mb-1">Your name</label>
+      <input id="obName" type="text" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+      <label class="block text-sm font-medium text-slate-700 mb-1">Region</label>
+      <select id="obRegion" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-6 focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <option value="">— Select —</option>
+        <option value="UK">UK (Simpro)</option>
+        <option value="BigChange">BigChange</option>
+        <option value="ANZ">ANZ</option>
+        <option value="US">US (Simpro)</option>
+        <option value="ClockShark">ClockShark</option>
+      </select>
+      <button onclick="obNext(1)" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 transition-all">Next →</button>
+    </div>
+
+    <!-- Step 2 -->
+    <div id="obS2" class="hidden">
+      <label class="block text-sm font-medium text-slate-700 mb-1">Annual OTE (<span id="obSym">$</span>)</label>
+      <input id="obOTE" type="number" placeholder="e.g. 40000" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+      <div class="flex gap-3 mt-2">
+        <button onclick="obBack()" class="flex-1 border border-slate-200 text-slate-600 font-medium rounded-xl py-3 hover:bg-slate-50 transition-all">← Back</button>
+        <button onclick="obNext(2)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 transition-all">Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div id="obS3" class="hidden">
+      <p class="text-sm text-slate-500 mb-4">Quarterly quotas (<span id="obSym2">$</span>)</p>
+      <div class="grid grid-cols-2 gap-3 mb-6">
+        <div><label class="text-xs text-slate-500">Q1</label><input id="obQ1" type="number" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="text-xs text-slate-500">Q2</label><input id="obQ2" type="number" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="text-xs text-slate-500">Q3</label><input id="obQ3" type="number" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="text-xs text-slate-500">Q4</label><input id="obQ4" type="number" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="obBack()" class="flex-1 border border-slate-200 text-slate-600 font-medium rounded-xl py-3 hover:bg-slate-50 transition-all">← Back</button>
+        <button onclick="obFinish()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 transition-all">Launch Dashboard →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="pgApp" style="display:none">
+
+  <!-- Top nav -->
+  <nav class="bg-slate-800 text-white px-4 py-2 flex items-center gap-2 sticky top-0 z-40 shadow-lg">
+    <div class="flex flex-col gap-0.5 flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center text-xs font-bold">SE</div>
+        <div>
+          <div class="font-semibold text-sm leading-tight">SE: SE Attainment Tracker</div>
+          <div class="text-[10px] text-slate-400 leading-tight">Simpro Group · Real-time</div>
+        </div>
+      </div>
+      <button onclick="doBigQueryPull()" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded font-medium ml-9 text-left">BigQuery Pull</button>
+    </div>
+    <!-- Nav KPI blocks -->
+    <div class="flex items-stretch gap-1.5 ml-3">
+      <div class="bg-slate-700/60 rounded-lg px-3 py-1.5 border border-slate-600/50 min-w-[118px]">
+        <div class="text-[9px] text-slate-400 uppercase tracking-wide font-medium">Commission to Quota</div>
+        <div id="kpiAtt" class="text-sm font-bold text-slate-200 leading-tight">0.00%</div>
+        <div id="kpiAttSub" class="text-[10px] text-slate-500 mt-0.5">$0 of $0</div>
+        <div class="h-1 bg-slate-600 rounded-full mt-1 overflow-hidden">
+          <div id="kpiAttBar" class="h-full rounded-full bg-slate-400 transition-all" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="bg-slate-700/60 rounded-lg px-3 py-1.5 border border-slate-600/50 min-w-[100px]">
+        <div class="text-[9px] text-slate-400 uppercase tracking-wide font-medium">Attainment</div>
+        <div id="kpiComm" class="text-sm font-bold text-slate-200 leading-tight">$0</div>
+        <div id="kpiStatus" class="mt-0.5"><span class="text-[10px] font-semibold text-slate-400">—</span></div>
+      </div>
+      <div class="bg-slate-700/60 rounded-lg px-3 py-1.5 border border-slate-600/50 min-w-[100px]">
+        <div class="text-[9px] text-slate-400 uppercase tracking-wide font-medium">Net Topline</div>
+        <div id="navKpiTopline" class="text-sm font-bold text-slate-200 leading-tight">$0</div>
+        <div id="kpiStatusSub" class="text-[10px] text-slate-500 mt-0.5">—</div>
+      </div>
+      <div class="bg-slate-700/60 rounded-lg px-3 py-1.5 border border-slate-600/50 min-w-[90px]">
+        <div class="text-[9px] text-slate-400 uppercase tracking-wide font-medium">Days Remaining</div>
+        <div id="kpiDays" class="text-sm font-bold text-slate-200 leading-tight">—</div>
+        <div id="kpiDaysSub" class="text-[10px] text-slate-500 mt-0.5 hidden">—</div>
+        <div class="h-1 bg-slate-600 rounded-full mt-1 overflow-hidden">
+          <div id="kpiDaysBar" class="h-full rounded-full bg-blue-400 transition-all" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Hidden legacy IDs used by JS -->
+    <span id="kpiOTE" class="hidden"></span>
+    <div class="flex-1"></div>
+    <select id="qSel" onchange="onQChange()" class="bg-slate-700 text-white text-xs px-2 py-1 rounded-lg border border-slate-600 focus:outline-none">
+      <option value="Q1">Q1 2026</option>
+      <option value="Q2">Q2 2026</option>
+      <option value="Q3">Q3 2026</option>
+      <option value="Q4">Q4 2026</option>
+    </select>
+    <button id="btnSE"    onclick="showTab('se')"    class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium ml-2">My Dashboard</button>
+    <button id="btnAdmin"  onclick="showTab('admin')"  class="text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium hidden">Team View</button>
+    <button id="btnReport" onclick="showTab('report')" class="text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium ml-1">Report</button>
+    <div id="saveInd" class="text-xs text-slate-400 ml-2"></div>
+    <button onclick="doSignOut()" class="text-xs text-slate-400 hover:text-white ml-2">Sign out</button>
+  </nav>
+
+  <!-- SE Dashboard -->
+  <div id="tabSE" class="px-4 py-4">
+    <div class="flex gap-4 items-start">
+
+      <!-- LEFT SIDEBAR -->
+      <div class="w-52 flex-shrink-0 space-y-4">
+
+        <!-- Settings -->
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+          <h2 class="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-3">Comp Plan</h2>
+          <div class="space-y-2.5">
+            <div>
+              <label class="text-[10px] text-slate-400 uppercase tracking-wide">Annual OTE</label>
+              <input id="annOTE" type="number" oninput="onOTEChange()" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-400 uppercase tracking-wide">Quarterly OTE</label>
+              <input id="qOTE" type="number" oninput="scheduleSave()" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-400 uppercase tracking-wide">SE Quota (USD)</label>
+              <input id="seQuota" type="number" oninput="scheduleSave()" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-400 uppercase tracking-wide">FX Rate to USD</label>
+              <input id="fxRate" type="number" step="0.001" oninput="scheduleSave()" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Quarter quotas -->
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+          <h2 class="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-3">2026 Quotas</h2>
+          <div id="quotaRef" class="text-xs space-y-1"></div>
+        </div>
+
+        <!-- Structural alert -->
+        <div id="structAlert" class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 hidden">
+          <p class="font-semibold mb-1">⚠️ Structural Gap</p>
+          <p>SE quota ($175,008) exceeds AE pool at 100% ($104,455). AEs need to collectively hit <strong>100.5%+</strong> before SEs earn commission.</p>
+        </div>
+      </div>
+
+      <!-- CENTER COLUMN -->
+      <div class="flex-1 min-w-0 space-y-4">
+
+        <!-- Progress bar -->
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class="font-semibold text-slate-700 text-sm">Quota Progress — Your Revenue vs SE Quota</span>
+              <div class="flex items-center gap-3 text-[10px] text-slate-400">
+                <span class="flex items-center gap-1"><span class="inline-block w-3 h-2.5 rounded-sm bg-blue-400/70"></span> Your Revenue</span>
+                <span class="flex items-center gap-1"><span class="inline-block w-4 border-t-2 border-dashed border-slate-400"></span> SE Quota</span>
+              </div>
+            </div>
+            <span id="pbLabel" class="text-xs font-mono font-semibold text-slate-600 flex-shrink-0">0%</span>
+          </div>
+          <div class="relative h-4 bg-slate-100 rounded-full overflow-hidden">
+            <div id="pbFill" class="absolute inset-y-0 left-0 rounded-full bg-blue-400/70 transition-all" style="width:0%"></div>
+            <div class="absolute inset-y-0 left-[60%] w-px bg-slate-300"></div>
+            <div class="absolute inset-y-0 left-[80%] w-px bg-slate-300"></div>
+            <div class="absolute inset-y-0 left-[100%] w-px bg-slate-400"></div>
+          </div>
+          <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+            <span id="pb60">60%</span>
+            <span id="pb80">80%</span>
+            <span id="pb100">100%</span>
+          </div>
+        </div>
+
+        <!-- AE Commission Pool -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+            <div>
+              <h2 class="font-semibold text-slate-800 text-sm">AE Commission Pool</h2>
+              <p class="text-xs text-slate-400 mt-0.5">Enter AE closed-won in native currency</p>
+            </div>
+            <button onclick="addAE()" class="text-xs text-blue-600 hover:text-blue-700 border border-blue-200 px-2 py-1 rounded-lg">+ Add AE</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50">
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-slate-500">AE Name</th>
+                  <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Type</th>
+                  <th class="px-2 py-2 text-right text-xs font-medium text-slate-500">$ Target $</th>
+                  <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Closed Won $</th>
+                  <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Att%</th>
+                </tr>
+              </thead>
+              <tbody id="aeBody"></tbody>
+              <tfoot class="bg-slate-50 border-t-2 border-slate-200">
+                <tr>
+                  <td colspan="2" class="px-4 py-2 text-xs font-semibold text-slate-600">Pool Total</td>
+                  <td class="px-2 py-2 text-right text-xs font-mono text-slate-500" id="ftTarget">—</td>
+                  <td class="px-2 py-2 text-center text-xs font-mono font-bold text-slate-700" id="ftClosed">—</td>
+                  <td class="px-2 py-2 text-center text-xs font-mono font-bold" id="ftAtt">—</td>
+                </tr>
+                <tr>
+                  <td colspan="5" class="px-4 py-1.5 text-xs" id="poolGap">—</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div class="px-4 py-2 bg-slate-50 border-t border-slate-100 flex gap-4 text-xs text-slate-500">
+            <span>Pool (USD): <strong id="poolUSD" class="text-slate-700">$0</strong></span>
+            <span>FX rate: <strong id="fxDisp" class="text-slate-700">1.00</strong></span>
+          </div>
+        </div>
+
+        <!-- Pay Curve chart -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-100">
+            <h2 class="font-semibold text-slate-800 text-sm">Pay Curve — When You <span id="payCurveLabel">$0</span></h2>
+            <p class="text-xs text-slate-400 mt-0.5">Commission payout vs. AE pool revenue · Floor at 60% · Cap at 200% OTE</p>
+          </div>
+          <div class="px-3 py-3" style="position:relative;height:420px"><canvas id="payCurveChart"></canvas></div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT SIDEBAR -->
+      <div class="w-64 flex-shrink-0 space-y-4">
+
+        <!-- Monthly Draw Breakdown -->
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+          <h2 class="font-semibold text-slate-800 text-sm mb-3">Monthly Draw Breakdown</h2>
+          <div id="drawCards" class="space-y-3"></div>
+        </div>
+
+        <!-- Threshold Calculator -->
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+          <h2 class="font-semibold text-slate-800 text-sm mb-3">Threshold Calculator</h2>
+          <div id="threshCards" class="space-y-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BigQuery Integration -->
+    <div class="mt-4">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 class="font-semibold text-slate-800 text-sm">BigQuery Integration</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Live data connection · Closed Won revenue from CRM</p>
+          </div>
+          <button onclick="doBigQueryPull()" class="text-xs text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-all font-medium">Preview BigQuery ↗</button>
+        </div>
+        <div class="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-xs">
+          <div>
+            <div class="text-slate-400 uppercase tracking-wide text-[10px] mb-1">Current Value</div>
+            <div id="bqCurrentValue" class="font-mono text-slate-700">—</div>
+            <div class="text-[10px] text-slate-400 mt-0.5">Pool USD total</div>
+          </div>
+          <div>
+            <div class="text-slate-400 uppercase tracking-wide text-[10px] mb-1">Sample Data</div>
+            <div id="bqSampleData" class="font-mono text-slate-700">—</div>
+            <div class="text-[10px] text-slate-400 mt-0.5">Last BigQuery row</div>
+          </div>
+          <div>
+            <div class="text-slate-400 uppercase tracking-wide text-[10px] mb-1">At All Time</div>
+            <div id="bqAtAllTime" class="font-mono text-slate-700">—</div>
+            <div class="text-[10px] text-slate-400 mt-0.5">Cumulative YTD</div>
+          </div>
+          <div>
+            <div class="text-slate-400 uppercase tracking-wide text-[10px] mb-1">Sample Schema</div>
+            <div class="font-mono text-slate-700 text-[10px] leading-relaxed">ae_name · closed_won<br>quarter · region</div>
+          </div>
+        </div>
+        <div class="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center gap-3">
+          <span class="inline-block w-2 h-2 rounded-full bg-slate-300 flex-shrink-0"></span>
+          <span class="text-xs text-slate-400">Not yet connected — contact admin to enable live BigQuery sync</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Tab -->
+  <div id="tabAdmin" class="hidden max-w-7xl mx-auto px-4 py-6">
+    <h2 class="text-lg font-bold text-slate-800 mb-4">Team Overview</h2>
+    <p id="adminEmpty" class="text-slate-400 text-sm hidden">No SE profiles found yet.</p>
+    <div id="adminGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+  </div>
+
+  <!-- Report Tab -->
+  <div id="tabReport" class="hidden max-w-7xl mx-auto px-4 py-6">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+      <div>
+        <h1 class="text-xl font-bold text-slate-800">FY 2026 SE Attainment Report</h1>
+        <p class="text-sm text-slate-400 mt-0.5">Sample data · Generated <span id="rptDate">—</span></p>
+      </div>
+      <span class="self-start sm:self-auto text-xs bg-amber-100 text-amber-700 font-semibold px-3 py-1.5 rounded-full border border-amber-200">Sample / Demo View</span>
+    </div>
+
+    <!-- Team KPIs -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="rptKPIs"></div>
+
+    <!-- Chart -->
+    <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200 mb-6">
+      <h2 id="rptChartTitle" class="font-semibold text-slate-800 text-sm mb-4">Quarterly Attainment by SE — Q1 · Q2 · Q3 actuals · Q4 pending</h2>
+      <div style="position:relative;height:280px"><canvas id="rptChart"></canvas></div>
+    </div>
+
+    <!-- SE Filter -->
+    <div class="flex items-center gap-3 mb-6 bg-white rounded-xl px-5 py-3.5 shadow-sm border border-slate-200">
+      <span class="text-sm font-medium text-slate-600 flex-shrink-0">Filter by SE:</span>
+      <select id="rptFilterSel" onchange="onRptFilter()" class="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+        <option value="">All SEs</option>
+      </select>
+      <span id="rptFilterBadge" class="hidden text-xs bg-blue-50 text-blue-600 font-semibold px-2.5 py-1 rounded-full border border-blue-200"></span>
+    </div>
+
+    <!-- Summary table -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-8 overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+        <h2 id="rptTableTitle" class="font-semibold text-slate-800 text-sm">Team Attainment Summary</h2>
+        <span class="text-xs text-slate-400">Actuals: Q1 · Q2 · Q3 &nbsp;·&nbsp; Pending: Q4</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="px-4 py-2.5 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">SE</th>
+              <th class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Region</th>
+              <th class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Q1</th>
+              <th class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Q2</th>
+              <th class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Q3</th>
+              <th class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Q4</th>
+              <th class="px-3 py-2.5 text-right text-xs font-medium text-slate-500 uppercase tracking-wide">YTD Comm.</th>
+              <th class="px-4 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Status</th>
+            </tr>
+          </thead>
+          <tbody id="rptTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Per-SE breakdown cards -->
+    <h2 class="font-semibold text-slate-800 text-base mb-4">Individual SE Breakdown</h2>
+    <div id="rptCards" class="space-y-4 mb-8"></div>
+
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-4 right-4 bg-slate-800 text-white text-xs px-4 py-2 rounded-lg shadow-lg hidden">Saved ✓</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCRIPT — no module imports, no Firebase, plain JS
+═══════════════════════════════════════════════════════ -->
+<script>
+
+// ── Firebase Auth (compat SDK — no modules needed) ─────
+var firebaseConfig = {
+  apiKey:            "AIzaSyDCvDXayIjHjuAFXg135MMZCpqtAZiswmI",
+  authDomain:        "se-quota-tracker.firebaseapp.com",
+  projectId:         "se-quota-tracker",
+  storageBucket:     "se-quota-tracker.firebasestorage.app",
+  messagingSenderId: "113593790107",
+  appId:             "1:113593790107:web:b36da7c4571160461de03e"
+};
+firebase.initializeApp(firebaseConfig);
+var fbAuth = firebase.auth();
+
+var ALLOWED_DOMAINS = ['simprogroup.com','simpro.us','simpro.au','simpro.nz','bigchange.com','clockshark.com'];
+
+function doGoogleSignIn() {
+  var provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  fbAuth.signInWithPopup(provider).then(function(result) {
+    var user = result.user;
+    var domain = user.email.split('@')[1] || '';
+    if (ALLOWED_DOMAINS.indexOf(domain) === -1) {
+      fbAuth.signOut();
+      var err = document.getElementById('loginErr');
+      err.textContent = 'Access denied: ' + user.email + ' is not an authorised account.';
+      err.classList.remove('hidden');
+      return;
+    }
+    doLogin(user.email, user.displayName || user.email.split('@')[0]);
+  }).catch(function(e) {
+    if (e.code !== 'auth/popup-closed-by-user') {
+      var err = document.getElementById('loginErr');
+      err.textContent = 'Sign-in failed: ' + e.message;
+      err.classList.remove('hidden');
+    }
+  });
+}
+
+// ── Constants ──────────────────────────────────────────
+var ADMIN_EMAILS = ['brad.towers@simprogroup.com'];
+
+var QUARTERS = {
+  Q1: { quota:175008, months:['January','February','March'],    pay:['February','March','April'],    start:'2026-01-01', end:'2026-03-31', days:90 },
+  Q2: { quota:226150, months:['April','May','June'],            pay:['May','June','July'],           start:'2026-04-01', end:'2026-06-30', days:91 },
+  Q3: { quota:288083, months:['July','August','September'],     pay:['August','September','October'],start:'2026-07-01', end:'2026-09-30', days:92 },
+  Q4: { quota:295123, months:['October','November','December'], pay:['November','December','January'],start:'2026-10-01', end:'2026-12-31', days:92 }
+};
+
+var DEFAULT_UK_AES = [
+  { id:'dom',    name:'Dom George',       type:'Strategic', target:15844, cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
+  { id:'mat',    name:'Mat Wray',         type:'Strategic', target:15844, cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
+  { id:'ricky',  name:'Ricky Campitelli', type:'Strategic', target:15844, cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
+  { id:'jake',   name:'Jake Beattie',     type:'Territory', target:6090,  cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
+  { id:'steven', name:'Steven Crake',     type:'Territory', target:6090,  cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
+  { id:'marc',   name:'Marc Rees',        type:'Territory', target:6090,  cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
+  { id:'david',  name:'David Taylor',     type:'Territory', target:6090,  cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
+  { id:'calum',  name:'Calum Radcliffe',  type:'Territory', target:6060,  cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
+  { id:'simon',  name:'Simon Heath',      type:'Strategic', target:0,     cw:0, status:'ramp',   aeRegion:'Simpro UK (VB)' },
+  { id:'thomas', name:'Thomas Bennett',   type:'Strategic', target:0,     cw:0, status:'ramp',   aeRegion:'Simpro UK (VB)' }
+];
+
+var REGION_NAMES = ['Simpro UK (VB)', 'BigChange UK', 'Simpro North America', 'Simpro ANZ'];
+
+var regionExpanded = {
+  'Simpro UK (VB)': false, 'BigChange UK': false,
+  'Simpro North America': false, 'Simpro ANZ': false
+};
+
+// ── App state ──────────────────────────────────────────
+var currentUser = null;
+var profile = null;
+var pool = [];
+var saveTimer = null;
+
+// ── localStorage helpers ───────────────────────────────
+function lsGet(k)    { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; }
+function lsSet(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+
+function getProfile(uid)     { return lsGet('seqt_p_' + uid); }
+function setProfile(uid, d)  {
+  lsSet('seqt_p_' + uid, d);
+  var ids = lsGet('seqt_ids') || [];
+  if (ids.indexOf(uid) === -1) { ids.push(uid); lsSet('seqt_ids', ids); }
+}
+function getPool(uid, q)    { return lsGet('seqt_ae_' + uid + '_' + q); }
+function setPool(uid, q, d) { lsSet('seqt_ae_' + uid + '_' + q, d); }
+function getAllProfiles()    {
+  var ids = lsGet('seqt_ids') || [];
+  return ids.map(function(id) { return getProfile(id); }).filter(function(p) { return p && p.onboarded; });
+}
+
+// ── Helpers ────────────────────────────────────────────
+function uid(email) {
+  var h = 0, i, c;
+  for (i = 0; i < email.length; i++) {
+    c = email.charCodeAt(i);
+    h = ((h << 5) - h) + c;
+    h = h | 0;
+  }
+  return 'u' + Math.abs(h).toString(36);
+}
+
+function fmt(n) { return isNaN(n) ? '$0' : '$' + Math.round(n).toLocaleString(); }
+function roundUp2(n) { return Math.ceil(n * 100) / 100; }
+
+function payout(cwUSD, quota, ote) {
+  if (!quota || !ote) return { att: 0, pay: 0 };
+  var att = roundUp2(cwUSD / quota);
+  if (att < 0.60) return { att: att, pay: 0 };
+  return { att: att, pay: Math.min(att, 2.0) * ote };
+}
+
+function attColor(a) {
+  if (a >= 1)   return 'text-green-600';
+  if (a >= 0.8) return 'text-blue-600';
+  if (a >= 0.6) return 'text-amber-600';
+  return 'text-red-500';
+}
+function barColor(a) {
+  if (a >= 1)   return 'bg-green-500';
+  if (a >= 0.8) return 'bg-blue-500';
+  if (a >= 0.6) return 'bg-amber-400';
+  return 'bg-red-400';
+}
+
+function showPage(id) {
+  document.getElementById('pgLogin').style.display   = (id === 'pgLogin')   ? 'block' : 'none';
+  document.getElementById('pgOnboard').style.display = (id === 'pgOnboard') ? 'block' : 'none';
+  document.getElementById('pgApp').style.display     = (id === 'pgApp')     ? 'block' : 'none';
+}
+
+function showToast() {
+  var t = document.getElementById('toast');
+  t.classList.remove('hidden');
+  setTimeout(function() { t.classList.add('hidden'); }, 2000);
+}
+
+// ── LOGIN ──────────────────────────────────────────────
+function doLogin(email, name) {
+  if (!email || !name) {
+    document.getElementById('loginErr').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('loginErr').classList.add('hidden');
+  currentUser = { uid: uid(email), email: email, name: name };
+  var p = getProfile(currentUser.uid);
+  if (!p || !p.onboarded) {
+    document.getElementById('obName').value = name;
+    showPage('pgOnboard');
+  } else {
+    profile = p;
+    loadPool();
+    buildDashboard();
+    showPage('pgApp');
+  }
+}
+
+// On load: auto-login if this browser already has a saved profile
+window.onload = function() {
+  var email = document.getElementById('inEmail').value.trim();
+  var name  = document.getElementById('inName').value.trim();
+  var savedUid = uid(email);
+  var p = getProfile(savedUid);
+  if (p && p.onboarded) {
+    // Returning user — skip login form
+    doLogin(email, name);
+  }
+  // Otherwise stay on login page and wait for button click
+};
+
+function doSignOut() {
+  currentUser = null;
+  profile = null;
+  pool = [];
+  showPage('pgLogin');
+}
+
+// ── ONBOARDING ─────────────────────────────────────────
+function obNext(step) {
+  if (step === 1) {
+    if (!document.getElementById('obName').value.trim() || !document.getElementById('obRegion').value) {
+      alert('Please fill in all fields.'); return;
+    }
+    var region = document.getElementById('obRegion').value;
+    var symMap = { UK:'£', BigChange:'£', ANZ:'A$', US:'$', ClockShark:'$' };
+    var sym = symMap[region] || '$';
+    document.getElementById('obSym').textContent = sym;
+    document.getElementById('obSym2').textContent = sym;
+    if (region === 'UK' || region === 'BigChange') {
+      document.getElementById('obQ1').value = 175008;
+      document.getElementById('obQ2').value = 226150;
+      document.getElementById('obQ3').value = 288083;
+      document.getElementById('obQ4').value = 295123;
+    }
+    document.getElementById('obS1').classList.add('hidden');
+    document.getElementById('obS2').classList.remove('hidden');
+    document.getElementById('obStep').textContent = '2';
+  } else if (step === 2) {
+    if (!document.getElementById('obOTE').value) { alert('Please enter Annual OTE.'); return; }
+    document.getElementById('obS2').classList.add('hidden');
+    document.getElementById('obS3').classList.remove('hidden');
+    document.getElementById('obStep').textContent = '3';
+  }
+}
+
+function obBack() {
+  if (!document.getElementById('obS2').classList.contains('hidden')) {
+    document.getElementById('obS2').classList.add('hidden');
+    document.getElementById('obS1').classList.remove('hidden');
+    document.getElementById('obStep').textContent = '1';
+  } else {
+    document.getElementById('obS3').classList.add('hidden');
+    document.getElementById('obS2').classList.remove('hidden');
+    document.getElementById('obStep').textContent = '2';
+  }
+}
+
+function obFinish() {
+  var region   = document.getElementById('obRegion').value;
+  var annual   = parseFloat(document.getElementById('obOTE').value) || 0;
+  var fxMap    = { UK:1.34, BigChange:1.34, ANZ:0.647, US:1.0, ClockShark:1.0 };
+  var symMap   = { UK:'£', BigChange:'£', ANZ:'A$', US:'$', ClockShark:'$' };
+  var fx = fxMap[region] || 1.0;
+  var sym = symMap[region] || '$';
+  var q1 = parseFloat(document.getElementById('obQ1').value) || 0;
+  var q2 = parseFloat(document.getElementById('obQ2').value) || 0;
+  var q3 = parseFloat(document.getElementById('obQ3').value) || 0;
+  var q4 = parseFloat(document.getElementById('obQ4').value) || 0;
+  profile = {
+    uid: currentUser.uid,
+    email: currentUser.email,
+    displayName: document.getElementById('obName').value.trim(),
+    region: region,
+    currency: sym,
+    fx: fx,
+    annualOTE: annual,
+    quarterlyOTE: Math.round(annual / 4),
+    quotas: { Q1: q1, Q2: q2, Q3: q3, Q4: q4 },
+    onboarded: true,
+    isAdmin: ADMIN_EMAILS.indexOf(currentUser.email) !== -1
+  };
+  setProfile(currentUser.uid, profile);
+  loadPool();
+  buildDashboard();
+  showPage('pgApp');
+}
+
+// ── POOL ───────────────────────────────────────────────
+function loadPool() {
+  var q = document.getElementById('qSel').value;
+  var saved = getPool(currentUser.uid, q);
+  if (saved) {
+    pool = saved;
+  } else {
+    pool = (profile.region === 'UK' || profile.region === 'BigChange')
+      ? JSON.parse(JSON.stringify(DEFAULT_UK_AES))
+      : [];
+  }
+}
+
+function savePool() {
+  var q = document.getElementById('qSel').value;
+  setPool(currentUser.uid, q, pool);
+  showToast();
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  document.getElementById('saveInd').textContent = 'Saving…';
+  saveTimer = setTimeout(function() {
+    savePool();
+    profile.annualOTE    = parseFloat(document.getElementById('annOTE').value) || 0;
+    profile.quarterlyOTE = parseFloat(document.getElementById('qOTE').value) || 0;
+    profile.fx           = parseFloat(document.getElementById('fxRate').value) || 1.0;
+    var q = document.getElementById('qSel').value;
+    profile.quotas[q]    = parseFloat(document.getElementById('seQuota').value) || 0;
+    setProfile(currentUser.uid, profile);
+    document.getElementById('saveInd').textContent = '';
+  }, 800);
+}
+
+// ── DASHBOARD ──────────────────────────────────────────
+function buildDashboard() {
+  var q    = document.getElementById('qSel').value;
+  var qd   = QUARTERS[q];
+  var sym  = profile.currency || '$';
+  var fx   = profile.fx || 1.0;
+  var quota = profile.quotas ? (profile.quotas[q] || qd.quota) : qd.quota;
+  var ote  = profile.quarterlyOTE || 0;
+
+  // Settings panel
+  document.getElementById('annOTE').value  = profile.annualOTE || 0;
+  document.getElementById('qOTE').value    = ote;
+  document.getElementById('seQuota').value = quota;
+  document.getElementById('fxRate').value  = fx;
+
+  // Quarter reference
+  var ref = document.getElementById('quotaRef');
+  ref.innerHTML = '';
+  ['Q1','Q2','Q3','Q4'].forEach(function(qk) {
+    var qv = profile.quotas ? (profile.quotas[qk] || QUARTERS[qk].quota) : QUARTERS[qk].quota;
+    var active = qk === q;
+    var row = document.createElement('div');
+    row.className = 'flex justify-between py-1 px-1.5 rounded ' + (active ? 'bg-blue-50' : '');
+    row.innerHTML = '<span class="' + (active ? 'text-blue-600 font-semibold' : 'text-slate-500') + '">' + qk + ' 2026' + (active ? ' ◀' : '') + '</span>'
+      + '<span class="font-mono ' + (active ? 'text-blue-700 font-semibold' : 'text-slate-600') + '">$' + qv.toLocaleString() + '</span>';
+    ref.appendChild(row);
+  });
+
+  // Structural alert
+  if (profile.region === 'UK') {
+    document.getElementById('structAlert').classList.remove('hidden');
+  } else {
+    document.getElementById('structAlert').classList.add('hidden');
+  }
+
+  // Admin button
+  if (profile.isAdmin) {
+    document.getElementById('btnAdmin').classList.remove('hidden');
+  }
+
+  // AE table
+  buildAETable(sym);
+  recalc();
+  updateDays();
+}
+
+function toggleRegion(r) {
+  regionExpanded[r] = !regionExpanded[r];
+  buildAETable();
+  recalc();
+}
+
+function buildAETable(sym) {
+  sym = sym || (profile ? profile.currency : '$') || '$';
+  var tbody = document.getElementById('aeBody');
+  while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+
+  REGION_NAMES.forEach(function(region, ri) {
+    var regionAEs = pool.filter(function(ae) {
+      return (ae.aeRegion || 'Simpro UK (VB)') === region;
+    });
+    var rTarget = 0, rCW = 0;
+    regionAEs.forEach(function(ae) { rTarget += ae.target || 0; rCW += ae.cw || 0; });
+    var rAtt = rTarget > 0 ? rCW / rTarget : 0;
+    var expanded = !!regionExpanded[region];
+
+    // ── Region header row (always visible)
+    var htr = document.createElement('tr');
+    htr.className = 'border-t-2 border-slate-200 bg-slate-50 cursor-pointer select-none hover:bg-slate-100 transition-colors';
+    htr.onclick = (function(r) { return function() { toggleRegion(r); }; })(region);
+
+    var hNameTd = document.createElement('td');
+    hNameTd.colSpan = 2;
+    hNameTd.className = 'px-4 py-2 text-xs font-semibold text-slate-700';
+    var chevron = document.createElement('span');
+    chevron.className = 'mr-1.5 text-slate-400 text-xs';
+    chevron.textContent = expanded ? '▾' : '▸';
+    hNameTd.appendChild(chevron);
+    hNameTd.appendChild(document.createTextNode(region + (regionAEs.length > 0 ? ' (' + regionAEs.length + ')' : '')));
+    htr.appendChild(hNameTd);
+
+    var hTargetTd = document.createElement('td');
+    hTargetTd.className = 'px-2 py-2 text-right text-xs font-mono text-slate-500';
+    hTargetTd.textContent = rTarget > 0 ? sym + Math.round(rTarget).toLocaleString() : '—';
+    htr.appendChild(hTargetTd);
+
+    var hCwTd = document.createElement('td');
+    hCwTd.className = 'px-2 py-2 text-center text-xs font-mono font-bold text-slate-700';
+    hCwTd.id = 'rcw_' + ri;
+    hCwTd.textContent = sym + Math.round(rCW).toLocaleString();
+    htr.appendChild(hCwTd);
+
+    var hAttTd = document.createElement('td');
+    hAttTd.id = 'ratt_' + ri;
+    hAttTd.className = 'px-2 py-2 text-center text-xs font-mono font-semibold';
+    if (rTarget > 0) {
+      hAttTd.textContent = Math.round(rAtt * 100) + '%';
+      hAttTd.className += ' ' + attColor(rAtt);
+    } else {
+      hAttTd.textContent = '—';
+      hAttTd.className += ' text-slate-400';
+    }
+    htr.appendChild(hAttTd);
+    tbody.appendChild(htr);
+
+    // ── Individual AE rows (only when expanded)
+    if (!expanded) return;
+
+    if (regionAEs.length === 0) {
+      var emptyTr = document.createElement('tr');
+      var emptyTd = document.createElement('td');
+      emptyTd.colSpan = 5;
+      emptyTd.className = 'px-8 py-2 text-xs text-slate-400 italic border-t border-slate-100 bg-white';
+      emptyTd.textContent = 'No AEs — use + Add AE to add one';
+      emptyTr.appendChild(emptyTd);
+      tbody.appendChild(emptyTr);
+      return;
+    }
+
+    regionAEs.forEach(function(ae) {
+      var poolIdx = pool.indexOf(ae);
+      var tr = document.createElement('tr');
+      tr.className = 'ae-hover border-t border-slate-100 bg-white' + (ae.status === 'ramp' ? ' bg-amber-50/40' : '');
+
+      var nameTd = document.createElement('td');
+      nameTd.className = 'px-4 py-1.5 text-sm text-slate-700 pl-7';
+      nameTd.textContent = ae.name;
+      if (ae.status === 'ramp') {
+        var rampBadge = document.createElement('span');
+        rampBadge.className = 'text-xs bg-amber-100 text-amber-600 px-1 rounded ml-1';
+        rampBadge.textContent = 'Ramp';
+        nameTd.appendChild(rampBadge);
+      }
+      tr.appendChild(nameTd);
+
+      var typeCell = document.createElement('td');
+      typeCell.className = 'px-2 py-1.5 text-center';
+      var typeBadge = document.createElement('span');
+      typeBadge.className = 'text-xs px-1.5 py-0.5 rounded ' + (ae.type === 'Strategic' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500');
+      typeBadge.textContent = ae.type[0];
+      typeCell.appendChild(typeBadge);
+      tr.appendChild(typeCell);
+
+      var targetCell = document.createElement('td');
+      targetCell.className = 'px-2 py-1.5 text-right font-mono text-xs text-slate-500';
+      if (ae.target > 0) {
+        targetCell.textContent = sym + ae.target.toLocaleString();
+      } else {
+        var tbcSpan = document.createElement('span');
+        tbcSpan.className = 'text-amber-500';
+        tbcSpan.textContent = 'TBC';
+        targetCell.appendChild(tbcSpan);
+      }
+      tr.appendChild(targetCell);
+
+      var cwCell = document.createElement('td');
+      cwCell.className = 'px-2 py-1.5';
+      var inputWrap = document.createElement('div');
+      inputWrap.className = 'relative';
+      var symSpan = document.createElement('span');
+      symSpan.className = 'absolute left-1.5 top-1.5 text-slate-400 text-xs';
+      symSpan.textContent = sym;
+      var inp = document.createElement('input');
+      inp.type = 'number';
+      inp.value = ae.cw || 0;
+      inp.min = 0;
+      inp.setAttribute('data-idx', poolIdx);
+      inp.className = 'input-cell w-24 pl-5 pr-1 py-1 text-xs font-mono rounded text-right ae-input';
+      inp.addEventListener('input', function() {
+        var idx = parseInt(this.getAttribute('data-idx'));
+        pool[idx].cw = parseFloat(this.value) || 0;
+        recalc();
+        scheduleSave();
+      });
+      inputWrap.appendChild(symSpan);
+      inputWrap.appendChild(inp);
+      cwCell.appendChild(inputWrap);
+      tr.appendChild(cwCell);
+
+      var attCell = document.createElement('td');
+      attCell.className = 'px-2 py-1.5 text-center';
+      var attSpan = document.createElement('span');
+      attSpan.id = 'att_' + poolIdx;
+      attSpan.className = 'text-xs font-mono font-semibold text-slate-300';
+      attSpan.textContent = '—';
+      attCell.appendChild(attSpan);
+      tr.appendChild(attCell);
+
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+function addAE() {
+  pool.push({ id:'ae_'+Date.now(), name:'New AE', type:'Territory', target:0, cw:0, status:'active', aeRegion:'Simpro UK (VB)' });
+  buildAETable();
+  recalc();
+}
+
+function doBigQueryPull() {
+  var t = document.getElementById('toast');
+  t.textContent = 'BigQuery Pull — not yet wired up';
+  t.classList.remove('hidden');
+  setTimeout(function() { t.classList.add('hidden'); t.textContent = 'Saved \u2713'; }, 3000);
+}
+
+// ── RECALCULATE ────────────────────────────────────────
+function recalc() {
+  var quota = parseFloat(document.getElementById('seQuota').value) || 0;
+  var ote   = parseFloat(document.getElementById('qOTE').value) || 0;
+  var fx    = parseFloat(document.getElementById('fxRate').value) || 1.0;
+  var q     = document.getElementById('qSel').value;
+  var qd    = QUARTERS[q];
+  var sym   = profile ? (profile.currency || '$') : '$';
+
+  var totTarget = 0, totClosed = 0;
+  pool.forEach(function(ae, i) {
+    totTarget += ae.target || 0;
+    totClosed += ae.cw || 0;
+    var el = document.getElementById('att_' + i);
+    if (el) {
+      if (ae.target > 0) {
+        var a = ae.cw / ae.target;
+        el.textContent = Math.round(a * 100) + '%';
+        el.className = 'text-xs font-mono font-semibold ' + attColor(a);
+      } else {
+        el.textContent = ae.cw > 0 ? '∞' : '—';
+        el.className = 'text-xs font-mono text-amber-400';
+      }
+    }
+  });
+
+  // Keep region header totals in sync
+  REGION_NAMES.forEach(function(region, ri) {
+    var rAEs = pool.filter(function(ae){ return (ae.aeRegion||'Simpro UK (VB)') === region; });
+    var rTgt = 0, rCW = 0;
+    rAEs.forEach(function(ae){ rTgt += ae.target||0; rCW += ae.cw||0; });
+    var rAtt = rTgt > 0 ? rCW / rTgt : 0;
+    var rcwEl = document.getElementById('rcw_' + ri);
+    if (rcwEl) rcwEl.textContent = sym + Math.round(rCW).toLocaleString();
+    var rattEl = document.getElementById('ratt_' + ri);
+    if (rattEl) {
+      if (rTgt > 0) {
+        rattEl.textContent = Math.round(rAtt * 100) + '%';
+        rattEl.className = 'px-2 py-2 text-center text-xs font-mono font-semibold ' + attColor(rAtt);
+      } else {
+        rattEl.textContent = '—';
+        rattEl.className = 'px-2 py-2 text-center text-xs font-mono text-slate-400';
+      }
+    }
+  });
+
+  var poolUSD = totClosed * fx;
+  var res = payout(poolUSD, quota, ote);
+  var att = res.att;
+  var pay = res.pay;
+  var floor60 = quota * 0.60;
+  var attPct = (att * 100).toFixed(2);
+
+  // KPIs
+  document.getElementById('kpiAtt').textContent = attPct + '%';
+  document.getElementById('kpiAtt').className = 'text-sm font-bold leading-tight ' + attColor(att);
+  document.getElementById('kpiAttSub').textContent = fmt(poolUSD) + ' of ' + fmt(quota);
+  document.getElementById('kpiAttBar').style.width = Math.min(att * 100, 100) + '%';
+  document.getElementById('kpiAttBar').className = 'h-full rounded-full transition-all ' + barColor(att);
+  document.getElementById('kpiComm').textContent = fmt(pay);
+  document.getElementById('kpiOTE').textContent = fmt(ote);
+
+  var badges = att >= 2   ? ['bg-purple-100 text-purple-700', '200%+ Cap 🚀']
+             : att >= 1   ? ['bg-green-100 text-green-700',   'Quota Hit ✓']
+             : att >= 0.8 ? ['bg-blue-100 text-blue-700',     'On Track']
+             : att >= 0.6 ? ['bg-amber-100 text-amber-700',   'Qualified ✓']
+             :              ['bg-red-100 text-red-700',        'Below Floor'];
+  document.getElementById('kpiStatus').innerHTML = '<span class="inline-block text-xs font-bold px-2 py-0.5 rounded-full ' + badges[0] + '">' + badges[1] + '</span>';
+  document.getElementById('kpiStatusSub').textContent = att >= 0.6
+    ? fmt(Math.max(0, quota - poolUSD)) + ' to 100%'
+    : 'Need ' + fmt(floor60 - poolUSD) + ' to qualify';
+
+  // Progress bar
+  document.getElementById('pbFill').style.width = Math.min(att, 1.05) * 100 + '%';
+  document.getElementById('pbFill').className = 'absolute inset-y-0 left-0 rounded-full transition-all ' + barColor(att);
+  document.getElementById('pbLabel').textContent = attPct + '%';
+  document.getElementById('pb60').textContent = fmt(floor60) + ' (60%)';
+  document.getElementById('pb80').textContent = fmt(quota * 0.8) + ' (80%)';
+  document.getElementById('pb100').textContent = fmt(quota) + ' (100%)';
+
+  // AE footer
+  document.getElementById('ftTarget').textContent = sym + Math.round(totTarget).toLocaleString();
+  document.getElementById('ftClosed').textContent = sym + Math.round(totClosed).toLocaleString();
+  document.getElementById('poolUSD').textContent = fmt(poolUSD);
+  document.getElementById('fxDisp').textContent = '$' + fx.toFixed(3);
+  var pAtt = totTarget > 0 ? Math.round(totClosed / totTarget * 100) : 0;
+  var ftAtt = document.getElementById('ftAtt');
+  ftAtt.textContent = pAtt + '%';
+  ftAtt.className = 'px-2 py-2 text-center font-bold text-sm ' + attColor(totClosed / Math.max(totTarget, 1));
+  var gapNative = Math.max(0, Math.ceil(floor60 / fx - totClosed));
+  document.getElementById('poolGap').innerHTML = att >= 0.6
+    ? '<span class="text-green-600 font-semibold">✓ Floor cleared</span> — ' + fmt(quota - poolUSD) + ' gap to 100%'
+    : 'AEs need <strong class="text-red-600">' + sym + gapNative.toLocaleString() + '</strong> more to unlock SE commission';
+
+  // Nav KPI: Net Topline
+  var navToplineEl = document.getElementById('navKpiTopline');
+  if (navToplineEl) navToplineEl.textContent = fmt(poolUSD);
+
+  // Monthly draws
+  buildDraws(poolUSD, quota, ote, qd);
+
+  // Threshold cards
+  buildThresh(quota, ote, poolUSD, totClosed, totTarget, fx, sym);
+
+  // Pay curve chart
+  buildPayCurveChart(quota, ote, poolUSD);
+}
+
+function buildDraws(poolUSD, quota, ote, qd) {
+  var months = [
+    { name: qd.months[0], pay: qd.pay[0], cumUSD: poolUSD/3,   linQ: quota/3 },
+    { name: qd.months[1], pay: qd.pay[1], cumUSD: poolUSD*2/3, linQ: quota*2/3 },
+    { name: qd.months[2], pay: qd.pay[2], cumUSD: poolUSD,      linQ: quota, trueup: true }
+  ];
+  var cumPaid = 0;
+  var html = '';
+  months.forEach(function(m) {
+    var r = payout(m.cumUSD, m.linQ, ote);
+    var draw, badge, cls;
+    if (m.trueup) {
+      var full = payout(m.cumUSD, quota, ote);
+      draw = Math.max(0, full.pay - cumPaid);
+      badge = r.att >= 0.6 ? ['bg-blue-100 text-blue-700', 'True-up ✓'] : ['bg-slate-100 text-slate-500', 'No payout'];
+      cls = 'border-2 border-blue-200 bg-blue-50';
+    } else {
+      draw = Math.max(0, r.pay - cumPaid);
+      cumPaid += draw;
+      badge = r.att >= 1   ? ['bg-green-100 text-green-700', 'Capped @ 100%']
+            : r.att >= 0.6 ? ['bg-amber-100 text-amber-700', 'Draw paid']
+            :                ['bg-red-100 text-red-700',      'Below floor — $0'];
+      cls = 'border border-slate-200';
+    }
+    html += '<div class="' + cls + ' rounded-lg p-3">'
+      + '<div class="flex items-center justify-between mb-1">'
+      + '<div><div class="font-semibold text-sm text-slate-700">' + m.name + (m.trueup ? ' <span class="text-blue-600 text-xs font-normal">True-up</span>' : '') + '</div>'
+      + '<div class="text-xs text-slate-400">Checkpoint: ' + fmt(m.linQ) + '</div></div>'
+      + '<div class="text-right"><div class="text-base font-bold ' + (m.trueup ? 'text-blue-700' : 'text-slate-800') + '">' + fmt(draw) + '</div>'
+      + '<span class="text-xs px-1.5 py-0.5 rounded ' + badge[0] + '">' + badge[1] + '</span></div></div>'
+      + '<div class="text-xs text-slate-400 mt-1">Pay by 30 ' + m.pay + '</div></div>';
+  });
+  document.getElementById('drawCards').innerHTML = html;
+}
+
+function buildThresh(quota, ote, poolUSD, closedNat, targetNat, fx, sym) {
+  var thresholds = [
+    { label: 'Qualify (60% floor)', pct: 0.60, icon: '🔑' },
+    { label: '80% Attainment',      pct: 0.80, icon: '🎯' },
+    { label: '100% Quota',          pct: 1.00, icon: '🏆' },
+    { label: '150% Stretch',        pct: 1.50, icon: '🚀' }
+  ];
+  var html = '';
+  thresholds.forEach(function(t) {
+    var needUSD = quota * t.pct;
+    var needNat = needUSD / fx;
+    var remUSD  = Math.max(0, needUSD - poolUSD);
+    var remNat  = Math.max(0, needNat - poolUSD / fx);
+    var pay     = payout(needUSD, quota, ote).pay;
+    var done    = poolUSD >= needUSD;
+    var aeAtt   = targetNat > 0 ? Math.round(needNat / targetNat * 100) : 0;
+    html += '<div class="flex items-center gap-3 p-2.5 rounded-lg border ' + (done ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-slate-50') + '">'
+      + '<span class="text-xl">' + t.icon + '</span>'
+      + '<div class="flex-1 min-w-0"><div class="text-xs font-semibold text-slate-700">' + t.label + '</div>'
+      + '<div class="text-xs text-slate-500 mt-0.5">' + (done ? '<span class="text-green-600 font-semibold">✓ Achieved</span>' : 'Need ' + fmt(remUSD) + ' (' + sym + Math.round(remNat).toLocaleString() + ') more') + '</div>'
+      + '<div class="text-xs text-slate-400">AEs need ' + aeAtt + '% collectively · Commission: <span class="font-semibold text-slate-700">' + fmt(pay) + '</span></div>'
+      + '</div></div>';
+  });
+  document.getElementById('threshCards').innerHTML = html;
+}
+
+function updateDays() {
+  var q = document.getElementById('qSel').value;
+  var qd = QUARTERS[q];
+  var today = new Date();
+  var start = new Date(qd.start), end = new Date(qd.end);
+  var elapsed   = Math.max(0, Math.min(Math.round((today - start) / 86400000), qd.days));
+  var remaining = Math.max(0, qd.days - elapsed);
+  document.getElementById('kpiDays').textContent = remaining;
+  document.getElementById('kpiDaysSub').textContent = 'days left · ' + elapsed + ' of ' + qd.days + ' elapsed';
+  document.getElementById('kpiDaysBar').style.width = Math.round(elapsed / qd.days * 100) + '%';
+}
+
+// ── EVENT HANDLERS ─────────────────────────────────────
+function onOTEChange() {
+  var ann = parseFloat(document.getElementById('annOTE').value) || 0;
+  document.getElementById('qOTE').value = Math.round(ann / 4);
+  recalc();
+  scheduleSave();
+}
+
+function onQChange() {
+  loadPool();
+  buildDashboard();
+}
+
+function showTab(t) {
+  document.getElementById('tabSE').classList.toggle('hidden',     t !== 'se');
+  document.getElementById('tabAdmin').classList.toggle('hidden',  t !== 'admin');
+  document.getElementById('tabReport').classList.toggle('hidden', t !== 'report');
+
+  var active   = 'text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium ml-2';
+  var inactive = 'text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium ml-2';
+  document.getElementById('btnSE').className     = t === 'se'     ? active : inactive;
+  document.getElementById('btnReport').className = t === 'report' ? active : inactive;
+
+  var btnAdmin = document.getElementById('btnAdmin');
+  if (profile && profile.isAdmin) {
+    btnAdmin.className = t === 'admin' ? active : inactive;
+    btnAdmin.classList.remove('hidden');
+  } else {
+    btnAdmin.classList.add('hidden');
+  }
+
+  if (t === 'admin')  buildAdminView();
+  if (t === 'report') buildReportTab();
+}
+
+function buildAdminView() {
+  var grid  = document.getElementById('adminGrid');
+  var empty = document.getElementById('adminEmpty');
+  var q     = document.getElementById('qSel').value;
+  var all   = getAllProfiles();
+  if (!all.length) { grid.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  grid.innerHTML = '';
+  all.forEach(function(p) {
+    var sePool = getPool(p.uid, q) || [];
+    var totCW = 0;
+    sePool.forEach(function(ae) { totCW += ae.cw || 0; });
+    var poolUSD = totCW * (p.fx || 1.0);
+    var quota   = p.quotas ? (p.quotas[q] || QUARTERS[q].quota) : QUARTERS[q].quota;
+    var ote     = p.quarterlyOTE || 0;
+    var res     = payout(poolUSD, quota, ote);
+    var attPct  = (res.att * 100).toFixed(1);
+    var badge   = res.att >= 1   ? ['bg-green-100 text-green-700', 'Quota Hit ✓']
+                : res.att >= 0.6 ? ['bg-amber-100 text-amber-700', 'Qualified ✓']
+                :                  ['bg-red-100 text-red-700',      'Below Floor'];
+    var card = document.createElement('div');
+    card.className = 'bg-white rounded-xl shadow-sm border border-slate-200 p-4';
+    card.innerHTML = '<div class="flex items-start justify-between mb-3">'
+      + '<div><div class="font-semibold text-slate-800">' + (p.displayName || p.email) + '</div>'
+      + '<div class="text-xs text-slate-400 mt-0.5">' + (p.region || '—') + ' · ' + p.email + '</div></div>'
+      + '<span class="text-xs font-semibold px-2 py-1 rounded-full ' + badge[0] + '">' + badge[1] + '</span></div>'
+      + '<div class="space-y-2">'
+      + '<div class="flex justify-between text-sm"><span class="text-slate-500">Attainment</span><span class="font-bold">' + attPct + '%</span></div>'
+      + '<div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full rounded-full ' + barColor(res.att) + '" style="width:' + Math.min(res.att*100,100) + '%"></div></div>'
+      + '<div class="flex justify-between text-xs text-slate-500"><span>' + fmt(poolUSD) + ' / ' + fmt(quota) + '</span><span class="font-semibold">Est: ' + fmt(res.pay) + '</span></div>'
+      + '</div>';
+    grid.appendChild(card);
+  });
+}
+
+
+// ── PAY CURVE CHART ────────────────────────────────────
+var payCurveChartInst = null;
+
+function buildPayCurveChart(quota, ote, currentPoolUSD) {
+  var el = document.getElementById('payCurveChart');
+  if (!el) return;
+  if (payCurveChartInst) { payCurveChartInst.destroy(); payCurveChartInst = null; }
+
+  var lbl = document.getElementById('payCurveLabel');
+  if (lbl) lbl.textContent = fmt(currentPoolUSD);
+
+  if (!quota || !ote) return;
+
+  var maxUSD = Math.max(quota * 2.1, 1000);
+  var numPoints = 200;
+  var labels = [], payData = [];
+  for (var i = 0; i <= numPoints; i++) {
+    var x = maxUSD * i / numPoints;
+    labels.push('$' + Math.round(x / 1000) + 'k');
+    payData.push(payout(x, quota, ote).pay);
+  }
+
+  var curIdx = Math.min(Math.round(currentPoolUSD / maxUSD * numPoints), numPoints);
+  var curPay = payout(currentPoolUSD, quota, ote).pay;
+  var scatterData = new Array(numPoints + 1).fill(null);
+  scatterData[curIdx] = curPay;
+
+  payCurveChartInst = new Chart(el.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Commission Payout',
+          data: payData,
+          borderColor: 'rgb(59,130,246)',
+          backgroundColor: 'rgba(191,219,254,0.30)',
+          fill: true,
+          tension: 0,
+          pointRadius: 0,
+          borderWidth: 2,
+          order: 2
+        },
+        {
+          label: 'Your Position',
+          data: scatterData,
+          borderColor: 'rgb(16,185,129)',
+          backgroundColor: 'rgb(16,185,129)',
+          pointRadius: scatterData.map(function(v) { return v !== null ? 7 : 0; }),
+          pointHoverRadius: 9,
+          showLine: false,
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, usePointStyle: true, padding: 16 } },
+        tooltip: {
+          filter: function(item) { return item.dataset.label === 'Commission Payout'; },
+          callbacks: {
+            title: function(items) { return 'Pool: ' + (items[0] ? items[0].label : ''); },
+            label: function(c) { return 'Commission: ' + fmt(c.parsed.y); }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { font: { size: 10 }, maxTicksLimit: 14, maxRotation: 0 },
+          grid: { color: 'rgba(0,0,0,0.04)' }
+        },
+        y: {
+          ticks: { callback: function(v) { return '$' + Math.round(v / 1000) + 'k'; }, font: { size: 10 } },
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
+// ── SAMPLE REPORT ──────────────────────────────────────
+var rptChartInst = null;
+
+var SAMPLE_SES = [
+  { name:'Thilo Schatz',     manager:'Pete Mansel',  title:'VP, Global Sales Engineering',          location:'California, US',    region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:60000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:1.05,Q2:1.12,Q3:1.08,Q4:null}             },
+  { name:'Brad Towers',      manager:'Thilo Schatz', title:'Global Sr. Manager, Sales Engineering', location:'London, UK',         region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:40000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.78,Q2:0.92,Q3:1.05,Q4:null}, isMe:true  },
+  { name:'Austin Huddleson', manager:'Thilo Schatz', title:'Sales Engineer, Technology Integration',location:'California, US',    region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.88,Q2:0.95,Q3:1.02,Q4:null}             },
+  { name:'Carter Jones',     manager:'Thilo Schatz', title:'Senior Sales Engineer',                 location:'Colorado, US',       region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:45000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:1.12,Q2:1.08,Q3:0.97,Q4:null}             },
+  { name:'Conor Breen',      manager:'Thilo Schatz', title:'Senior Sales Engineer, Partnerships',   location:'Colorado, US',       region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:45000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.72,Q2:0.86,Q3:1.01,Q4:null}             },
+  { name:'Isabelle Schicht', manager:'Thilo Schatz', title:'Associate Sales Engineer',              location:'California, US',    region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:38000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.65,Q2:0.83,Q3:0.91,Q4:null}             },
+  { name:'Joseph Valdez',    manager:'Thilo Schatz', title:'Sales Engineer',                        location:'Colorado, US',       region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.55,Q2:0.71,Q3:0.88,Q4:null}             },
+  { name:'Sarah Sareh',      manager:'Thilo Schatz', title:'Senior Sales Engineer',                 location:'Texas, US',          region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:45000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.98,Q2:1.15,Q3:1.22,Q4:null}             },
+  { name:'Adam Skinner',     manager:'Brad Towers',  title:'Sales Engineer',                        location:'Cambridgeshire, UK', region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.82,Q2:0.79,Q3:0.94,Q4:null}             },
+  { name:'Danielle Berson',  manager:'Brad Towers',  title:'Sales Engineer',                     location:'West Yorkshire, UK', region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:45000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.70,Q2:null,Q3:null,Q4:null} },
+  { name:'Dave Shaw',        manager:'Brad Towers',  title:'Sales Engineer',                        location:'Warwickshire, UK',   region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.91,Q2:1.03,Q3:0.98,Q4:null}             },
+  { name:'Dylan Rhodes',     manager:'Brad Towers',  title:'Sales Engineer',                        location:'Brisbane, AU',       region:'ANZ', currency:'A$',  fx:0.647, quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.68,Q2:0.76,Q3:0.85,Q4:null}             },
+  { name:'Jason Passey',     manager:'Brad Towers',  title:'Sales Engineer',                        location:'Cambridgeshire, UK', region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.95,Q2:0.88,Q3:1.07,Q4:null}             },
+  { name:'Lee Wilkinson',    manager:'Brad Towers',  title:'Principal Sales Engineer',              location:'Gwynedd, UK',        region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:48000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:1.08,Q2:1.20,Q3:1.15,Q4:null}             },
+  { name:'Matthew Beecham',  manager:'Brad Towers',  title:'Associate Sales Engineer',              location:'Leeds, UK',          region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:38000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.58,Q2:0.73,Q3:0.82,Q4:null}             },
+  { name:'Rodante Galamay',  manager:'Brad Towers',  title:'Sales Engineer',                        location:'Auckland, NZ',       region:'NZ',  currency:'NZ$', fx:0.60,  quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.77,Q2:0.89,Q3:0.96,Q4:null}             },
+  { name:'Roger Quinn',      manager:'Brad Towers',  title:'Sales Engineer',                        location:'West Yorkshire, UK', region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.84,Q2:0.92,Q3:1.04,Q4:null}             },
+  { name:'Shane Rhodes',     manager:'Brad Towers',  title:'Senior Sales Engineer',                 location:'Brisbane, AU',       region:'ANZ', currency:'A$',  fx:0.647, quarterlyOTE:45000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:1.01,Q2:1.05,Q3:0.99,Q4:null}             }
+];
+
+function seYTD(se) {
+  var total = 0;
+  ['Q1','Q2','Q3'].forEach(function(q) {
+    var a = se.att[q];
+    if (a !== null) total += payout(a * se.quotas[q], se.quotas[q], se.quarterlyOTE).pay;
+  });
+  return total;
+}
+
+function seLatestStatus(se) {
+  var lastA = null;
+  ['Q1','Q2','Q3'].forEach(function(q) { if (se.att[q] !== null) lastA = se.att[q]; });
+  if (lastA === null) return { cls:'bg-slate-100 text-slate-500',  label:'—'            };
+  if (lastA >= 1)    return { cls:'bg-green-100 text-green-700',   label:'Quota Hit ✓'  };
+  if (lastA >= 0.8)  return { cls:'bg-blue-100 text-blue-700',     label:'On Track'     };
+  if (lastA >= 0.6)  return { cls:'bg-amber-100 text-amber-700',   label:'Qualified ✓'  };
+  return                    { cls:'bg-red-100 text-red-700',        label:'Below Floor'  };
+}
+
+// DOM helpers — safe text-only insertion
+function cel(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
+function ctxt(tag, cls, text) { var e = cel(tag, cls); e.textContent = text; return e; }
+function app(parent) {
+  for (var i = 1; i < arguments.length; i++) { if (arguments[i]) parent.appendChild(arguments[i]); }
+  return parent;
+}
+
+function mkKpiNode(label, val, sub, valCls) {
+  var card = cel('div', 'bg-white rounded-xl p-4 shadow-sm border border-slate-200');
+  app(card,
+    ctxt('div', 'text-xs text-slate-400 mb-1', label),
+    ctxt('div', 'text-2xl font-bold ' + (valCls || 'text-slate-800'), String(val)),
+    ctxt('div', 'text-xs text-slate-400 mt-1', sub)
+  );
+  return card;
+}
+
+function buildReportTab() {
+  var today = new Date();
+  document.getElementById('rptDate').textContent =
+    today.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+
+  // ── Team KPIs
+  var atQuota=0, qualified=0, below=0, totalComm=0, sumAtt=0, cntAtt=0;
+  SAMPLE_SES.forEach(function(se) {
+    totalComm += seYTD(se);
+    ['Q1','Q2','Q3'].forEach(function(q) {
+      var a = se.att[q];
+      if (a === null) return;
+      sumAtt += a; cntAtt++;
+      if (a >= 1)        atQuota++;
+      else if (a >= 0.6) qualified++;
+      else               below++;
+    });
+  });
+  var avgAtt = cntAtt ? sumAtt / cntAtt : 0;
+
+  var kpisEl = document.getElementById('rptKPIs');
+  while (kpisEl.firstChild) kpisEl.removeChild(kpisEl.firstChild);
+  app(kpisEl,
+    mkKpiNode('Team Size',             SAMPLE_SES.length + ' SEs',               'FY 2026 sample',       'text-slate-800'),
+    mkKpiNode('Avg Attainment (YTD)',  Math.round(avgAtt * 100) + '%',           'Q1–Q3 combined',       avgAtt >= 1 ? 'text-green-600' : avgAtt >= 0.6 ? 'text-amber-600' : 'text-red-500'),
+    mkKpiNode('Quarters at Quota',     atQuota + ' of ' + SAMPLE_SES.length*3,  'Q1–Q3 quarter-slots',  'text-blue-600'),
+    mkKpiNode('Total Est. Commission', fmt(totalComm),                           'YTD through Q3',       'text-slate-800')
+  );
+
+  // ── Chart
+  buildReportChart();
+
+  // ── Populate filter dropdown
+  var sel = document.getElementById('rptFilterSel');
+  while (sel.options.length > 1) sel.remove(1);
+  SAMPLE_SES.forEach(function(se) {
+    var opt = document.createElement('option');
+    opt.value = se.name;
+    opt.textContent = se.name + (se.isMe ? ' (you)' : '');
+    sel.appendChild(opt);
+  });
+
+  // ── Initial render
+  rebuildRptList(SAMPLE_SES);
+}
+
+function rebuildRptList(seList) {
+  var avatarColors = ['blue','emerald','violet','amber','rose','teal','indigo','orange','cyan','pink','lime','fuchsia','sky','green','yellow','red','purple','slate'];
+
+  // ── Table
+  var tbody = document.getElementById('rptTableBody');
+  while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+  seList.forEach(function(se) {
+    var ytd = seYTD(se);
+    var st  = seLatestStatus(se);
+    var tr  = cel('tr', 'border-t border-slate-100 hover:bg-slate-50' + (se.isMe ? ' bg-blue-50/40' : ''));
+
+    var nameCell = cel('td', 'px-4 py-2.5');
+    var nameDiv = ctxt('div', 'text-sm font-medium text-slate-700', se.name);
+    if (se.isMe)    app(nameDiv, ctxt('span', 'text-xs text-blue-400 font-normal ml-1', '(you)'));
+    app(nameCell, nameDiv, ctxt('div', 'text-xs text-slate-400 mt-0.5', se.title));
+    tr.appendChild(nameCell);
+
+    var regionCell = cel('td', 'px-3 py-2.5 text-center');
+    app(regionCell,
+      ctxt('div', 'text-xs font-medium text-slate-600', se.location.split(', ').pop()),
+      ctxt('div', 'text-xs text-slate-400 mt-0.5', se.location.split(', ')[0]));
+    tr.appendChild(regionCell);
+
+    ['Q1','Q2','Q3','Q4'].forEach(function(q) {
+      var a = se.att[q];
+      var td = cel('td', 'px-3 py-2.5 text-center');
+      if (a === null) {
+        td.className += ' text-xs text-slate-300';
+        td.textContent = '—';
+      } else {
+        var cls = a >= 1 ? 'text-green-600' : a >= 0.8 ? 'text-blue-600' : a >= 0.6 ? 'text-amber-600' : 'text-red-500';
+        td.className += ' text-xs font-mono font-semibold ' + cls;
+        td.textContent = Math.round(a * 100) + '%';
+      }
+      tr.appendChild(td);
+    });
+
+    app(tr, ctxt('td', 'px-3 py-2.5 text-right text-xs font-mono font-semibold text-slate-700', fmt(ytd)));
+
+    var stCell = cel('td', 'px-4 py-2.5 text-center');
+    app(stCell, ctxt('span', 'text-xs font-semibold px-2 py-0.5 rounded-full ' + st.cls, st.label));
+    tr.appendChild(stCell);
+
+    tbody.appendChild(tr);
+  });
+
+  // ── Cards
+  var cardsEl = document.getElementById('rptCards');
+  while (cardsEl.firstChild) cardsEl.removeChild(cardsEl.firstChild);
+  seList.forEach(function(se, idx) {
+    cardsEl.appendChild(buildSeCard(se, idx, seYTD(se), seLatestStatus(se), avatarColors));
+  });
+}
+
+var rptFilter = '';
+
+function onRptFilter() {
+  rptFilter = document.getElementById('rptFilterSel').value;
+  var seList = rptFilter
+    ? SAMPLE_SES.filter(function(se){ return se.name === rptFilter; })
+    : SAMPLE_SES;
+
+  // Update chart title
+  var chartTitle = document.getElementById('rptChartTitle');
+  if (chartTitle) chartTitle.textContent = rptFilter
+    ? rptFilter + ' — Q1 · Q2 · Q3 Attainment'
+    : 'Quarterly Attainment by SE — Q1 · Q2 · Q3 actuals · Q4 pending';
+
+  // Update table title
+  var tableTitle = document.getElementById('rptTableTitle');
+  if (tableTitle) tableTitle.textContent = rptFilter
+    ? rptFilter + ' — Attainment Detail'
+    : 'Team Attainment Summary';
+
+  // Update filter badge
+  var badge = document.getElementById('rptFilterBadge');
+  if (badge) {
+    if (rptFilter) {
+      badge.textContent = '1 of ' + SAMPLE_SES.length + ' SEs';
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  buildReportChart(seList);
+  rebuildRptList(seList);
+}
+
+function buildSeCard(se, idx, ytd, st, avatarColors) {
+  var aColor   = avatarColors[idx % avatarColors.length];
+  var initials = se.name.split(' ').map(function(w){ return w[0]; }).join('');
+
+  var card = cel('div', 'bg-white rounded-xl shadow-sm border '
+    + (se.isMe ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200')
+    + ' overflow-hidden');
+
+  // ── Card header
+  var header = cel('div', 'px-5 py-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between');
+
+  var avatar = ctxt('div', 'w-8 h-8 rounded-lg bg-' + aColor + '-100 flex items-center justify-center text-xs font-bold text-' + aColor + '-700', initials);
+
+  var nameEl = ctxt('div', 'font-semibold text-sm text-slate-800', se.name);
+  if (se.isMe)    app(nameEl, ctxt('span', 'text-xs text-blue-400 font-normal ml-1', '(you)'));
+
+  var infoEl = app(cel('div'),
+    nameEl,
+    ctxt('div', 'text-xs text-slate-600 font-medium mt-0.5', se.title),
+    ctxt('div', 'text-xs text-slate-400', se.location + ' · Reports to: ' + se.manager));
+
+  var ytdBox = app(cel('div', 'text-right'),
+    ctxt('div', 'text-xs text-slate-400', 'YTD Commission'),
+    ctxt('div', 'font-bold text-slate-800 text-sm', fmt(ytd)));
+
+  app(header,
+    app(cel('div', 'flex items-center gap-3'), avatar, infoEl),
+    app(cel('div', 'flex items-center gap-3'),
+      ctxt('span', 'text-xs font-semibold px-2 py-0.5 rounded-full ' + st.cls, st.label),
+      ytdBox));
+  card.appendChild(header);
+
+  // ── Quarterly strips
+  var grid = cel('div', 'grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-slate-100');
+  ['Q1','Q2','Q3','Q4'].forEach(function(q) {
+    var a = se.att[q];
+    var isPending = (a === null);
+    var qComm = isPending ? 0 : payout(a * se.quotas[q], se.quotas[q], se.quarterlyOTE).pay;
+    var barW  = isPending ? 0 : Math.round(Math.min(a, 1.0) * 100);
+
+    var strip = cel('div', 'p-3.5' + (isPending ? ' bg-slate-50/70' : ''));
+
+    var stripHdr = cel('div', 'flex items-center justify-between mb-2');
+    app(stripHdr,
+      ctxt('span', 'text-xs font-semibold text-slate-600', q + ' 2026'),
+      isPending
+        ? ctxt('span', 'text-xs text-slate-300 italic', 'Pending')
+        : ctxt('span', 'text-xs font-mono font-bold ' + attColor(a), Math.round(a * 100) + '%'));
+
+    var barOuter = cel('div', 'h-1.5 bg-slate-100 rounded-full overflow-hidden mb-2');
+    var barInner = cel('div', 'h-full rounded-full ' + (isPending ? 'bg-slate-200' : barColor(a)));
+    barInner.style.width = barW + '%';
+    barOuter.appendChild(barInner);
+
+    var commEl = ctxt('div', 'text-xs text-slate-400',
+      isPending ? '—' : (qComm > 0 ? fmt(qComm) + ' earned' : 'No payout'));
+
+    app(strip, stripHdr, barOuter, commEl);
+    grid.appendChild(strip);
+  });
+  card.appendChild(grid);
+  return card;
+}
+
+function buildReportChart(seList) {
+  seList = seList || SAMPLE_SES;
+  var ctx = document.getElementById('rptChart').getContext('2d');
+  if (rptChartInst) { rptChartInst.destroy(); rptChartInst = null; }
+
+  var qColors = [
+    { bg:'rgba(59,130,246,0.75)',  border:'rgb(59,130,246)' },
+    { bg:'rgba(16,185,129,0.75)',  border:'rgb(16,185,129)' },
+    { bg:'rgba(245,158,11,0.75)',  border:'rgb(245,158,11)' }
+  ];
+  var datasets = ['Q1','Q2','Q3'].map(function(q, i) {
+    return {
+      label: q + ' 2026',
+      data: seList.map(function(se){ return se.att[q] !== null ? Math.round(se.att[q] * 100) : null; }),
+      backgroundColor: qColors[i].bg,
+      borderColor:     qColors[i].border,
+      borderWidth: 1,
+      borderRadius: 4
+    };
+  });
+  datasets.push({ label:'Quota (100%)', type:'line',
+    data: seList.map(function(){ return 100; }),
+    borderColor:'rgba(239,68,68,0.65)', borderWidth:2, borderDash:[6,4],
+    pointRadius:0, fill:false, order:-1, tension:0 });
+  datasets.push({ label:'60% Floor', type:'line',
+    data: seList.map(function(){ return 60; }),
+    borderColor:'rgba(245,158,11,0.65)', borderWidth:1.5, borderDash:[4,4],
+    pointRadius:0, fill:false, order:-1, tension:0 });
+
+  rptChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: seList.map(function(se){ return se.name.split(' ')[0]; }),
+      datasets: datasets
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position:'top', labels:{ font:{ size:11 }, usePointStyle:true, padding:16 } },
+        tooltip: { callbacks: { label: function(c) {
+          return c.dataset.label + ': ' + (c.parsed.y !== null ? c.parsed.y + '%' : '—');
+        }}}
+      },
+      scales: {
+        y: { min:0, max:140,
+             ticks:{ callback:function(v){ return v+'%'; }, font:{ size:10 }, stepSize:20 },
+             grid: { color:'rgba(0,0,0,0.04)' } },
+        x: { ticks:{ font:{ size:11 } }, grid:{ display:false } }
+      }
+    }
+  });
+}
+
+</script>
+</body>
+</html>
