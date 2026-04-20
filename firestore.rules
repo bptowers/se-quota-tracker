@@ -1,12 +1,53 @@
 rules_version = '2';
 
-// TEST MODE — open rules, no authentication required
-// TODO: Replace with secure rules before going live with the full team
+// Data model (see firestore.indexes.json):
+//   /users/{uid}         — SE profile: displayName, region, OTE, quotas, fx, onboarded
+//   /aePools/{poolId}    — AE pool entry: seUid, quarter, pool array (name/type/target/cw)
+//
+// Auth: Firebase Google SSO — request.auth.uid is the Firebase UID,
+//       request.auth.token.email is the verified Google email.
+//
+// Admin: brad.towers@simprogroup.com — can read all data (Team View).
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    function isSignedIn() {
+      return request.auth != null;
     }
+
+    function isAdmin() {
+      return request.auth != null
+          && request.auth.token.email == 'brad.towers@simprogroup.com';
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ── User profiles ──────────────────────────────────────────────────────
+    // Each SE owns exactly one document keyed by their Firebase UID.
+    // Admin can read any profile for Team View.
+    match /users/{uid} {
+      allow read:   if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid);
+      allow delete: if false; // profiles are never deleted via the app
+    }
+
+    // ── AE pools ───────────────────────────────────────────────────────────
+    // Each document carries a seUid field identifying the owning SE.
+    // Admin can read all pools for Team View aggregation.
+    match /aePools/{poolId} {
+      allow read:   if isAdmin()
+                    || (isSignedIn() && resource.data.seUid == request.auth.uid);
+      allow create: if isSignedIn()
+                    && request.resource.data.seUid == request.auth.uid;
+      allow update: if isSignedIn()
+                    && resource.data.seUid == request.auth.uid;
+      allow delete: if isSignedIn()
+                    && resource.data.seUid == request.auth.uid;
+    }
+
   }
 }
