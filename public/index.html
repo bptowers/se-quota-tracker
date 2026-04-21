@@ -213,12 +213,6 @@
           <h2 class="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-3">2026 Quotas</h2>
           <div id="quotaRef" class="text-xs space-y-1"></div>
         </div>
-
-        <!-- Structural alert -->
-        <div id="structAlert" class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 hidden">
-          <p class="font-semibold mb-1">⚠️ Structural Gap</p>
-          <p>SE quota ($175,008) exceeds AE pool at 100% ($104,455). AEs need to collectively hit <strong>100.5%+</strong> before SEs earn commission.</p>
-        </div>
       </div>
 
       <!-- CENTER COLUMN -->
@@ -836,12 +830,6 @@ function buildDashboard() {
     ref.appendChild(row);
   });
 
-  // Structural alert
-  if (profile.region === 'UK') {
-    document.getElementById('structAlert').classList.remove('hidden');
-  } else {
-    document.getElementById('structAlert').classList.add('hidden');
-  }
 
   // Admin button
   if (profile.isAdmin) {
