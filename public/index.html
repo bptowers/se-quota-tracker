@@ -439,29 +439,51 @@ var firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 var fbAuth = firebase.auth();
 var db     = firebase.firestore();
+var lastHandledAuthUid = null;
 
 var ALLOWED_DOMAINS = ['simprogroup.com','simpro.us','simpro.au','simpro.nz','bigchange.com','clockshark.com'];
 
-function doGoogleSignIn() {
+function googleProvider() {
   var provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  fbAuth.signInWithPopup(provider).then(function(result) {
-    var user = result.user;
-    var domain = user.email.split('@')[1] || '';
-    if (ALLOWED_DOMAINS.indexOf(domain) === -1) {
-      fbAuth.signOut();
-      var err = document.getElementById('loginErr');
-      err.textContent = 'Access denied: ' + user.email + ' is not an authorised account.';
-      err.classList.remove('hidden');
-      return;
-    }
-    doLogin(user.email, user.displayName || user.email.split('@')[0], user.uid);
+  return provider;
+}
+
+function showLoginError(message) {
+  var err = document.getElementById('loginErr');
+  err.textContent = message;
+  err.classList.remove('hidden');
+}
+
+function handleAuthUser(user, showUnauthorized) {
+  if (!user) return;
+  if (lastHandledAuthUid === user.uid) return;
+  var domain = user.email.split('@')[1] || '';
+  if (ALLOWED_DOMAINS.indexOf(domain) === -1) {
+    lastHandledAuthUid = null;
+    fbAuth.signOut();
+    if (showUnauthorized) showLoginError('Access denied: ' + user.email + ' is not an authorised account.');
+    return;
+  }
+  lastHandledAuthUid = user.uid;
+  doLogin(user.email, user.displayName || user.email.split('@')[0], user.uid);
+}
+
+function doGoogleSignIn() {
+  fbAuth.signInWithRedirect(googleProvider()).catch(function(e) {
+    showLoginError('Sign-in failed: ' + e.message);
+  });
+}
+
+function restoreFirebaseSession() {
+  fbAuth.getRedirectResult().then(function(result) {
+    if (result.user) handleAuthUser(result.user, true);
   }).catch(function(e) {
-    if (e.code !== 'auth/popup-closed-by-user') {
-      var err = document.getElementById('loginErr');
-      err.textContent = 'Sign-in failed: ' + e.message;
-      err.classList.remove('hidden');
-    }
+    showLoginError('Sign-in failed: ' + e.message);
+  }).finally(function() {
+    fbAuth.onAuthStateChanged(function(user) {
+      handleAuthUser(user, false);
+    });
   });
 }
 
@@ -654,22 +676,14 @@ function doLogin(email, name, firebaseUid) {
 
 // On load: restore session via Firebase Auth state
 window.onload = function() {
-  fbAuth.onAuthStateChanged(function(user) {
-    if (user) {
-      var domain = user.email.split('@')[1] || '';
-      if (ALLOWED_DOMAINS.indexOf(domain) !== -1) {
-        doLogin(user.email, user.displayName || user.email.split('@')[0], user.uid);
-      } else {
-        fbAuth.signOut();
-      }
-    }
-  });
+  restoreFirebaseSession();
 };
 
 function doSignOut() {
   currentUser = null;
   profile = null;
   pool = [];
+  lastHandledAuthUid = null;
   fbAuth.signOut();
   showPage('pgLogin');
 }
