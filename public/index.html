@@ -461,6 +461,23 @@ var regionExpanded = {
   'ClockShark North America': false
 };
 
+function profileRegionName(region) {
+  var map = {
+    UK: 'Simpro UK (VB)',
+    BigChange: 'BigChange UK',
+    US: 'Simpro North America',
+    ANZ: 'Simpro ANZ',
+    ClockShark: 'ClockShark North America'
+  };
+  return map[region] || 'Simpro UK (VB)';
+}
+
+function defaultPoolForProfile() {
+  if (!profile) return [];
+  if (profile.region === 'UK') return JSON.parse(JSON.stringify(DEFAULT_UK_AES));
+  return [];
+}
+
 // ── App state ──────────────────────────────────────────
 var currentUser = null;
 var profile = null;
@@ -716,16 +733,14 @@ function loadPool(callback) {
 
   if (currentUser && currentUser.firebaseUid) {
     fsGetPool(currentUser.firebaseUid, q, function(saved) {
-      pool = saved || ((profile.region === 'UK' || profile.region === 'BigChange')
-        ? JSON.parse(JSON.stringify(DEFAULT_UK_AES))
-        : []);
+      pool = saved || defaultPoolForProfile();
+      regionExpanded[profileRegionName(profile.region)] = true;
       callback();
     });
   } else {
     var saved = getPool(currentUser.uid, q);
-    pool = saved || ((profile.region === 'UK' || profile.region === 'BigChange')
-      ? JSON.parse(JSON.stringify(DEFAULT_UK_AES))
-      : []);
+    pool = saved || defaultPoolForProfile();
+    regionExpanded[profileRegionName(profile.region)] = true;
     callback();
   }
 }
@@ -878,34 +893,86 @@ function buildAETable(sym) {
       tr.className = 'ae-hover border-t border-slate-100 bg-white' + (ae.status === 'ramp' ? ' bg-amber-50/40' : '');
 
       var nameTd = document.createElement('td');
-      nameTd.className = 'px-4 py-1.5 text-sm text-slate-700 pl-7';
-      nameTd.textContent = ae.name;
+      nameTd.className = 'px-4 py-1.5 pl-7';
+      var nameWrap = document.createElement('div');
+      nameWrap.className = 'flex items-center gap-1.5';
+      var nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.value = ae.name || '';
+      nameInput.setAttribute('data-idx', poolIdx);
+      nameInput.className = 'w-32 border border-transparent bg-transparent rounded px-1 py-0.5 text-sm text-slate-700 focus:bg-white focus:border-blue-300 focus:outline-none';
+      nameInput.addEventListener('input', function() {
+        var idx = parseInt(this.getAttribute('data-idx'));
+        pool[idx].name = this.value;
+        scheduleSave();
+      });
+      nameWrap.appendChild(nameInput);
       if (ae.status === 'ramp') {
         var rampBadge = document.createElement('span');
-        rampBadge.className = 'text-xs bg-amber-100 text-amber-600 px-1 rounded ml-1';
+        rampBadge.className = 'text-xs bg-amber-100 text-amber-600 px-1 rounded';
         rampBadge.textContent = 'Ramp';
-        nameTd.appendChild(rampBadge);
+        nameWrap.appendChild(rampBadge);
       }
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.setAttribute('data-idx', poolIdx);
+      delBtn.className = 'text-xs text-slate-300 hover:text-red-500 px-1';
+      delBtn.textContent = '×';
+      delBtn.title = 'Remove AE';
+      delBtn.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        var idx = parseInt(this.getAttribute('data-idx'));
+        pool.splice(idx, 1);
+        buildAETable(sym);
+        recalc();
+        scheduleSave();
+      });
+      nameWrap.appendChild(delBtn);
+      nameTd.appendChild(nameWrap);
       tr.appendChild(nameTd);
 
       var typeCell = document.createElement('td');
       typeCell.className = 'px-2 py-1.5 text-center';
-      var typeBadge = document.createElement('span');
-      typeBadge.className = 'text-xs px-1.5 py-0.5 rounded ' + (ae.type === 'Strategic' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500');
-      typeBadge.textContent = ae.type[0];
-      typeCell.appendChild(typeBadge);
+      var typeSelect = document.createElement('select');
+      typeSelect.setAttribute('data-idx', poolIdx);
+      typeSelect.className = 'text-xs border border-slate-200 rounded px-1 py-0.5 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-300';
+      ['Strategic', 'Territory'].forEach(function(type) {
+        var opt = document.createElement('option');
+        opt.value = type;
+        opt.textContent = type[0];
+        if ((ae.type || 'Territory') === type) opt.selected = true;
+        typeSelect.appendChild(opt);
+      });
+      typeSelect.addEventListener('change', function() {
+        var idx = parseInt(this.getAttribute('data-idx'));
+        pool[idx].type = this.value;
+        scheduleSave();
+      });
+      typeCell.appendChild(typeSelect);
       tr.appendChild(typeCell);
 
       var targetCell = document.createElement('td');
-      targetCell.className = 'px-2 py-1.5 text-right font-mono text-xs text-slate-500';
-      if (ae.target > 0) {
-        targetCell.textContent = sym + ae.target.toLocaleString();
-      } else {
-        var tbcSpan = document.createElement('span');
-        tbcSpan.className = 'text-amber-500';
-        tbcSpan.textContent = 'TBC';
-        targetCell.appendChild(tbcSpan);
-      }
+      targetCell.className = 'px-2 py-1.5';
+      var targetWrap = document.createElement('div');
+      targetWrap.className = 'relative flex justify-end';
+      var targetSym = document.createElement('span');
+      targetSym.className = 'absolute left-1.5 top-1.5 text-slate-400 text-xs';
+      targetSym.textContent = sym;
+      var targetInput = document.createElement('input');
+      targetInput.type = 'number';
+      targetInput.min = 0;
+      targetInput.value = ae.target || 0;
+      targetInput.setAttribute('data-idx', poolIdx);
+      targetInput.className = 'w-24 pl-5 pr-1 py-1 text-xs font-mono rounded text-right border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-300';
+      targetInput.addEventListener('input', function() {
+        var idx = parseInt(this.getAttribute('data-idx'));
+        pool[idx].target = parseFloat(this.value) || 0;
+        recalc();
+        scheduleSave();
+      });
+      targetWrap.appendChild(targetSym);
+      targetWrap.appendChild(targetInput);
+      targetCell.appendChild(targetWrap);
       tr.appendChild(targetCell);
 
       var cwCell = document.createElement('td');
@@ -947,9 +1014,12 @@ function buildAETable(sym) {
 }
 
 function addAE() {
-  pool.push({ id:'ae_'+Date.now(), name:'New AE', type:'Territory', target:0, cw:0, status:'active', aeRegion:'Simpro UK (VB)' });
+  var aeRegion = profileRegionName(profile ? profile.region : 'UK');
+  regionExpanded[aeRegion] = true;
+  pool.push({ id:'ae_'+Date.now(), name:'New AE', type:'Territory', target:0, cw:0, status:'active', aeRegion:aeRegion });
   buildAETable();
   recalc();
+  scheduleSave();
 }
 
 // ── RECALCULATE ────────────────────────────────────────
