@@ -114,7 +114,6 @@
           <div class="text-[10px] text-slate-400 leading-tight">Simpro Group · Real-time</div>
         </div>
       </div>
-      <button onclick="doBigQueryPull()" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded font-medium ml-9 text-left">BigQuery Pull</button>
     </div>
     <!-- Nav KPI blocks -->
     <div class="flex items-stretch gap-1.5 ml-3">
@@ -156,7 +155,7 @@
     </select>
     <button id="btnSE"    onclick="showTab('se')"    class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium ml-2">My Dashboard</button>
     <button id="btnAdmin"  onclick="showTab('admin')"  class="text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium hidden">Team View</button>
-    <button id="btnReport" onclick="showTab('report')" class="text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium ml-1">Report</button>
+    <button id="btnReport" onclick="showTab('report')" class="text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium ml-1 hidden">Report</button>
     <div id="saveInd" class="text-xs text-slate-400 ml-2"></div>
     <button onclick="doSignOut()" class="text-xs text-slate-400 hover:text-white ml-2">Sign out</button>
   </nav>
@@ -290,44 +289,6 @@
         <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
           <h2 class="font-semibold text-slate-800 text-sm mb-3">Threshold Calculator</h2>
           <div id="threshCards" class="space-y-2"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- BigQuery Integration -->
-    <div class="mt-4">
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h2 class="font-semibold text-slate-800 text-sm">BigQuery Integration</h2>
-            <p class="text-xs text-slate-400 mt-0.5">Live data connection · Closed Won revenue from CRM</p>
-          </div>
-          <button onclick="doBigQueryPull()" class="text-xs text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-all font-medium">Preview BigQuery ↗</button>
-        </div>
-        <div class="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-xs">
-          <div>
-            <div class="text-slate-400 uppercase tracking-wide text-[10px] mb-1">Current Value</div>
-            <div id="bqCurrentValue" class="font-mono text-slate-700">—</div>
-            <div class="text-[10px] text-slate-400 mt-0.5">Pool USD total</div>
-          </div>
-          <div>
-            <div class="text-slate-400 uppercase tracking-wide text-[10px] mb-1">Sample Data</div>
-            <div id="bqSampleData" class="font-mono text-slate-700">—</div>
-            <div class="text-[10px] text-slate-400 mt-0.5">Last BigQuery row</div>
-          </div>
-          <div>
-            <div class="text-slate-400 uppercase tracking-wide text-[10px] mb-1">At All Time</div>
-            <div id="bqAtAllTime" class="font-mono text-slate-700">—</div>
-            <div class="text-[10px] text-slate-400 mt-0.5">Cumulative YTD</div>
-          </div>
-          <div>
-            <div class="text-slate-400 uppercase tracking-wide text-[10px] mb-1">Sample Schema</div>
-            <div class="font-mono text-slate-700 text-[10px] leading-relaxed">ae_name · closed_won<br>quarter · region</div>
-          </div>
-        </div>
-        <div class="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center gap-3">
-          <span class="inline-block w-2 h-2 rounded-full bg-slate-300 flex-shrink-0"></span>
-          <span class="text-xs text-slate-400">Not yet connected — contact admin to enable live BigQuery sync</span>
         </div>
       </div>
     </div>
@@ -991,13 +952,6 @@ function addAE() {
   recalc();
 }
 
-function doBigQueryPull() {
-  var t = document.getElementById('toast');
-  t.textContent = 'BigQuery Pull — not yet wired up';
-  t.classList.remove('hidden');
-  setTimeout(function() { t.classList.add('hidden'); t.textContent = 'Saved \u2713'; }, 3000);
-}
-
 // ── RECALCULATE ────────────────────────────────────────
 function recalc() {
   var quota = parseFloat(document.getElementById('seQuota').value) || 0;
@@ -1201,7 +1155,7 @@ function showTab(t) {
   var active   = 'text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium ml-2';
   var inactive = 'text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium ml-2';
   document.getElementById('btnSE').className     = t === 'se'     ? active : inactive;
-  document.getElementById('btnReport').className = t === 'report' ? active : inactive;
+  document.getElementById('btnReport').className = (t === 'report' ? active : inactive) + ' hidden';
 
   var btnAdmin = document.getElementById('btnAdmin');
   if (profile && profile.isAdmin) {
