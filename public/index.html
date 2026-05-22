@@ -42,23 +42,6 @@
       </svg>
       Sign in with Google
     </button>
-
-    <!-- Divider -->
-    <div class="flex items-center gap-3 mb-4">
-      <div class="flex-1 h-px bg-slate-200"></div>
-      <span class="text-xs text-slate-400">or enter manually</span>
-      <div class="flex-1 h-px bg-slate-200"></div>
-    </div>
-
-    <!-- Manual fallback -->
-    <input id="inEmail" type="email" placeholder="your@email.com"
-      class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-    <input id="inName" type="text" placeholder="Your full name"
-      class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-    <button onclick="doLogin(document.getElementById('inEmail').value.trim(), document.getElementById('inName').value.trim())"
-      class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl px-5 py-3.5 transition-all">
-      Continue →
-    </button>
     <p id="loginErr" class="text-red-500 text-xs mt-3 hidden"></p>
     <p class="text-xs text-slate-400 mt-4">Access restricted to Simpro Group accounts</p>
   </div>
@@ -444,9 +427,7 @@ var lastHandledAuthUid = null;
 var ALLOWED_DOMAINS = ['simprogroup.com','simpro.us','simpro.au','simpro.nz','bigchange.com','clockshark.com'];
 
 function googleProvider() {
-  var provider = new firebase.auth.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-  return provider;
+  return new firebase.auth.GoogleAuthProvider();
 }
 
 function showLoginError(message) {
