@@ -441,6 +441,20 @@ function restoreFirebaseSession() {
 // ── Constants ──────────────────────────────────────────
 var ADMIN_EMAILS = ['brad.towers@simprogroup.com'];
 
+function isAdminEmail(email) {
+  return ADMIN_EMAILS.indexOf(String(email || '').toLowerCase()) !== -1;
+}
+
+function currentUserIsAdmin() {
+  return currentUser && isAdminEmail(currentUser.email);
+}
+
+function hydrateProfile(p) {
+  p = p || {};
+  p.isAdmin = currentUserIsAdmin();
+  return p;
+}
+
 var QUARTERS = {
   Q1: { quota:175008, months:['January','February','March'],    pay:['February','March','April'],    start:'2026-01-01', end:'2026-03-31', days:90 },
   Q2: { quota:226150, months:['April','May','June'],            pay:['May','June','July'],           start:'2026-04-01', end:'2026-06-30', days:91 },
@@ -620,7 +634,9 @@ function doLogin(email, name, firebaseUid) {
         document.getElementById('obName').value = name;
         showPage('pgOnboard');
       } else {
-        profile = p;
+        var wasAdmin = p.isAdmin;
+        profile = hydrateProfile(p);
+        if (profile.isAdmin !== wasAdmin) fsSetProfile(firebaseUid, profile);
         loadPool(function() {
           buildDashboard();
           showPage('pgApp');
@@ -633,7 +649,7 @@ function doLogin(email, name, firebaseUid) {
       document.getElementById('obName').value = name;
       showPage('pgOnboard');
     } else {
-      profile = p;
+      profile = hydrateProfile(p);
       loadPool(function() {
         buildDashboard();
         showPage('pgApp');
@@ -718,7 +734,7 @@ function obFinish() {
     quarterlyOTE: Math.round(annual / 4),
     quotas: { Q1: q1, Q2: q2, Q3: q3, Q4: q4 },
     onboarded: true,
-    isAdmin: ADMIN_EMAILS.indexOf(currentUser.email) !== -1
+    isAdmin: currentUserIsAdmin()
   };
   if (currentUser.firebaseUid) {
     profile.firebaseUid = currentUser.firebaseUid;
@@ -813,7 +829,7 @@ function buildDashboard() {
 
 
   // Admin button
-  if (profile.isAdmin) {
+  if (currentUserIsAdmin()) {
     document.getElementById('btnAdmin').classList.remove('hidden');
   }
 
@@ -1205,14 +1221,17 @@ function showTab(t) {
   var active   = 'text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium ml-2';
   var inactive = 'text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium ml-2';
   document.getElementById('btnSE').className     = t === 'se'     ? active : inactive;
-  document.getElementById('btnReport').className = (t === 'report' ? active : inactive) + ' hidden';
 
   var btnAdmin = document.getElementById('btnAdmin');
-  if (profile && profile.isAdmin) {
+  var btnReport = document.getElementById('btnReport');
+  if (currentUserIsAdmin()) {
     btnAdmin.className = t === 'admin' ? active : inactive;
+    btnReport.className = t === 'report' ? active : inactive;
     btnAdmin.classList.remove('hidden');
+    btnReport.classList.remove('hidden');
   } else {
     btnAdmin.classList.add('hidden');
+    btnReport.classList.add('hidden');
   }
 
   if (t === 'admin')  buildAdminView();
@@ -1229,7 +1248,7 @@ function buildAdminView() {
   grid.appendChild(loading);
   empty.classList.add('hidden');
 
-  if (!profile || !profile.isAdmin) {
+  if (!profile || !currentUserIsAdmin()) {
     while (grid.firstChild) grid.removeChild(grid.firstChild);
     empty.classList.remove('hidden');
     return;
