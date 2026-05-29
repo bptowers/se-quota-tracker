@@ -372,7 +372,7 @@
 // ── Firebase Auth (compat SDK — no modules needed) ─────
 var firebaseConfig = {
   apiKey:            "AIzaSyDCvDXayIjHjuAFXg135MMZCpqtAZiswmI",
-  authDomain:        "se-quota-tracker.firebaseapp.com",
+  authDomain:        "se-quota-tracker.web.app",
   projectId:         "se-quota-tracker",
   storageBucket:     "se-quota-tracker.firebasestorage.app",
   messagingSenderId: "113593790107",
@@ -410,7 +410,18 @@ function handleAuthUser(user, showUnauthorized) {
 }
 
 function doGoogleSignIn() {
-  fbAuth.signInWithRedirect(googleProvider()).catch(function(e) {
+  fbAuth.signInWithPopup(googleProvider()).then(function(result) {
+    if (result.user) handleAuthUser(result.user, true);
+  }).catch(function(e) {
+    if (e.code === 'auth/popup-blocked'
+      || e.code === 'auth/popup-closed-by-user'
+      || e.code === 'auth/cancelled-popup-request'
+      || e.code === 'auth/operation-not-supported-in-this-environment') {
+      fbAuth.signInWithRedirect(googleProvider()).catch(function(redirectError) {
+        showLoginError('Sign-in failed: ' + redirectError.message);
+      });
+      return;
+    }
     showLoginError('Sign-in failed: ' + e.message);
   });
 }
