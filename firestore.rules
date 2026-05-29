@@ -7,7 +7,7 @@ rules_version = '2';
 // Auth: Firebase Google SSO — request.auth.uid is the Firebase UID,
 //       request.auth.token.email is the verified Google email.
 //
-// Admin: brad.towers@simprogroup.com — can read all data (Team View).
+// Admins/leaders can read all data (Team View).
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -18,7 +18,11 @@ service cloud.firestore {
 
     function isAdmin() {
       return request.auth != null
-          && request.auth.token.email == 'brad.towers@simprogroup.com';
+          && request.auth.token.email in [
+            'brad.towers@simprogroup.com',
+            'thilo.schatz@simprogroup.com',
+            'thilo.schatz@simpro.us'
+          ];
     }
 
     function isOwner(uid) {
