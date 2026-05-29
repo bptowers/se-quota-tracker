@@ -114,6 +114,7 @@
           <div class="text-[10px] text-slate-400 leading-tight">Simpro Group · Real-time</div>
         </div>
       </div>
+      <button onclick="doBigQueryPull()" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded font-medium ml-9 text-left">Import from BigQuery</button>
     </div>
     <!-- Nav KPI blocks -->
     <div class="flex items-stretch gap-1.5 ml-3">
@@ -1019,6 +1020,13 @@ function addAE() {
   buildAETable();
   recalc();
   scheduleSave();
+}
+
+function doBigQueryPull() {
+  var t = document.getElementById('toast');
+  t.textContent = 'BigQuery import is not connected yet';
+  t.classList.remove('hidden');
+  setTimeout(function() { t.classList.add('hidden'); t.textContent = 'Saved \u2713'; }, 3000);
 }
 
 // ── RECALCULATE ────────────────────────────────────────
