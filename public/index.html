@@ -591,6 +591,52 @@ function fsGetPoolsForQuarter(q, callback) {
     .catch(function() { callback({}); });
 }
 
+function adminRosterProfiles(liveProfiles) {
+  var profiles = (liveProfiles || []).slice();
+  var seen = {};
+  profiles.forEach(function(p) {
+    var key = String(p.email || p.displayName || '').toLowerCase();
+    if (key) seen[key] = true;
+  });
+  if (typeof SAMPLE_SES === 'undefined') return profiles;
+  SAMPLE_SES.forEach(function(se, idx) {
+    var nameKey = String(se.name || '').toLowerCase();
+    if (seen[nameKey]) return;
+    profiles.push({
+      firebaseUid: 'roster_' + idx,
+      displayName: se.name,
+      email: 'Roster placeholder',
+      region: se.region,
+      currency: se.currency,
+      fx: se.fx,
+      quarterlyOTE: se.quarterlyOTE,
+      quotas: se.quotas,
+      sampleAtt: se.att,
+      title: se.title,
+      manager: se.manager,
+      location: se.location,
+      isRosterPlaceholder: true
+    });
+    seen[nameKey] = true;
+  });
+  return profiles;
+}
+
+function adminProfileMetrics(p, q, pools) {
+  var quota = p.quotas ? (p.quotas[q] || QUARTERS[q].quota) : QUARTERS[q].quota;
+  var ote = p.quarterlyOTE || 0;
+  var sePool = pools[p.firebaseUid] || [];
+  var totCW = 0;
+  sePool.forEach(function(ae) { totCW += ae.cw || 0; });
+  var poolUSD = totCW * (p.fx || 1.0);
+  if (p.isRosterPlaceholder && p.sampleAtt && p.sampleAtt[q] !== null && p.sampleAtt[q] !== undefined) {
+    poolUSD = p.sampleAtt[q] * quota;
+    totCW = poolUSD / (p.fx || 1.0);
+  }
+  var res = payout(poolUSD, quota, ote);
+  return { quota: quota, ote: ote, sePool: sePool, totCW: totCW, poolUSD: poolUSD, res: res };
+}
+
 // ── Helpers ────────────────────────────────────────────
 function uid(email) {
   var h = 0, i, c;
@@ -1284,19 +1330,17 @@ function buildAdminView() {
 
   fsGetAllProfiles(function(profiles) {
     fsGetPoolsForQuarter(q, function(pools) {
+      profiles = adminRosterProfiles(profiles);
       adminProfilesCache = profiles;
       adminPoolsCache = pools;
       while (grid.firstChild) grid.removeChild(grid.firstChild);
       if (!profiles.length) { empty.classList.remove('hidden'); return; }
 
       profiles.forEach(function(p, idx) {
-        var sePool = pools[p.firebaseUid] || [];
-        var totCW  = 0;
-        sePool.forEach(function(ae) { totCW += ae.cw || 0; });
-        var poolUSD = totCW * (p.fx || 1.0);
-        var quota   = p.quotas ? (p.quotas[q] || QUARTERS[q].quota) : QUARTERS[q].quota;
-        var ote     = p.quarterlyOTE || 0;
-        var res     = payout(poolUSD, quota, ote);
+        var metrics = adminProfileMetrics(p, q, pools);
+        var poolUSD = metrics.poolUSD;
+        var quota   = metrics.quota;
+        var res     = metrics.res;
         var attPct  = (res.att * 100).toFixed(1);
         var badge   = res.att >= 1   ? ['bg-green-100 text-green-700', 'Quota Hit \u2713']
                     : res.att >= FLOOR_THRESHOLD ? ['bg-amber-100 text-amber-700', 'Qualified \u2713']
@@ -1312,7 +1356,7 @@ function buildAdminView() {
 
         var headerRow = cel('div', 'flex items-start justify-between mb-3');
         var nameDiv   = ctxt('div', 'font-semibold text-slate-800', p.displayName || p.email);
-        var metaDiv   = ctxt('div', 'text-xs text-slate-400 mt-0.5', (p.region || '\u2014') + ' \u00b7 ' + p.email);
+        var metaDiv   = ctxt('div', 'text-xs text-slate-400 mt-0.5', (p.region || '\u2014') + ' \u00b7 ' + (p.isRosterPlaceholder ? 'Roster' : p.email));
         var infoWrap  = cel('div');
         app(infoWrap, nameDiv, metaDiv);
         var badgeEl   = ctxt('span', 'text-xs font-semibold px-2 py-1 rounded-full ' + badge[0], badge[1]);
@@ -1329,7 +1373,7 @@ function buildAdminView() {
         var footRow   = cel('div', 'flex justify-between text-xs text-slate-500');
         app(footRow,
           ctxt('span', '', fmt(poolUSD) + ' / ' + fmt(quota)),
-          ctxt('span', 'font-semibold', 'Est: ' + fmt(res.pay)));
+          ctxt('span', 'font-semibold', (p.isRosterPlaceholder ? 'Roster: ' : 'Est: ') + fmt(res.pay)));
 
         var hintRow = ctxt('div', 'text-xs text-blue-600 font-medium pt-1', 'View SE detail');
         var statsWrap = cel('div', 'space-y-2');
@@ -1348,15 +1392,14 @@ function showAdminDetail(profileIdx) {
   var p = adminProfilesCache[profileIdx];
   if (!p) return;
 
-  var sePool = adminPoolsCache[p.firebaseUid] || [];
+  var metrics = adminProfileMetrics(p, q, adminPoolsCache);
+  var sePool = metrics.sePool;
   var fx = p.fx || 1.0;
   var sym = p.currency || '$';
-  var quota = p.quotas ? (p.quotas[q] || QUARTERS[q].quota) : QUARTERS[q].quota;
-  var ote = p.quarterlyOTE || 0;
-  var totClosed = 0;
-  sePool.forEach(function(ae) { totClosed += ae.cw || 0; });
-  var poolUSD = totClosed * fx;
-  var res = payout(poolUSD, quota, ote);
+  var quota = metrics.quota;
+  var ote = metrics.ote;
+  var poolUSD = metrics.poolUSD;
+  var res = metrics.res;
   var gapToFloor = Math.max(0, quota * FLOOR_THRESHOLD - poolUSD);
   var gapToQuota = Math.max(0, quota - poolUSD);
 
@@ -1368,7 +1411,7 @@ function showAdminDetail(profileIdx) {
   app(titleWrap,
     ctxt('div', 'text-xs uppercase tracking-wide text-blue-500 font-semibold', 'SE Detail · ' + q + ' 2026'),
     ctxt('h3', 'text-lg font-bold text-slate-800 mt-0.5', p.displayName || p.email),
-    ctxt('div', 'text-sm text-slate-500 mt-0.5', (p.region || '—') + ' · ' + p.email));
+    ctxt('div', 'text-sm text-slate-500 mt-0.5', (p.region || '—') + ' · ' + (p.isRosterPlaceholder ? 'Roster placeholder' : p.email)));
   var closeBtn = ctxt('button', 'text-xs text-slate-500 hover:text-slate-800 border border-slate-200 bg-white rounded-lg px-2 py-1', 'Close');
   closeBtn.type = 'button';
   closeBtn.onclick = function() {
@@ -1383,7 +1426,7 @@ function showAdminDetail(profileIdx) {
     adminKpiNode('Est. Commission', fmt(res.pay), 'Quarterly OTE ' + fmt(ote), 'text-slate-800'),
     adminKpiNode('Gap to Floor', fmt(gapToFloor), Math.round(FLOOR_THRESHOLD * 100) + '% threshold', gapToFloor > 0 ? 'text-red-500' : 'text-green-600'),
     adminKpiNode('Gap to Quota', fmt(gapToQuota), '100% attainment', gapToQuota > 0 ? 'text-amber-600' : 'text-green-600'),
-    adminKpiNode('AE Entries', String(sePool.length), 'Closed-won rows', 'text-slate-800'));
+    adminKpiNode('AE Entries', String(sePool.length), p.isRosterPlaceholder ? 'Awaiting live onboarding' : 'Closed-won rows', 'text-slate-800'));
 
   var body = cel('div', 'p-5');
   var tableWrap = cel('div', 'overflow-x-auto border border-slate-100 rounded-lg');
@@ -1402,7 +1445,10 @@ function showAdminDetail(profileIdx) {
   var tbody = document.createElement('tbody');
   if (!sePool.length) {
     var emptyTr = document.createElement('tr');
-    var emptyTd = ctxt('td', 'px-3 py-4 text-center text-xs text-slate-400', 'No AE closed-won entries for this quarter.');
+    var emptyTd = ctxt('td', 'px-3 py-4 text-center text-xs text-slate-400',
+      p.isRosterPlaceholder
+        ? 'Roster summary only. This SE has not onboarded live AE detail yet.'
+        : 'No AE closed-won entries for this quarter.');
     emptyTd.colSpan = 6;
     emptyTr.appendChild(emptyTd);
     tbody.appendChild(emptyTr);
