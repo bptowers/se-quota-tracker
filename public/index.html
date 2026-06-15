@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js" integrity="sha384-3IYu+dnH2y9gX1s6p9F4D55XbEmZBfJ3D1Ylh8J6bfdqnJCOmDVSRTq1yhJsBY1H" crossorigin="anonymous"></script>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
   input[type=number]::-webkit-inner-spin-button,
@@ -114,7 +115,10 @@
           <div class="text-[10px] text-slate-400 leading-tight">Simpro Group · Real-time</div>
         </div>
       </div>
-      <button onclick="doBigQueryPull()" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded font-medium ml-9 text-left">Import from BigQuery</button>
+      <div id="bqStatusBlock" class="ml-9 flex flex-col gap-0.5">
+        <button id="syncNowBtn" onclick="doManualSync()" class="hidden text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-2 py-0.5 rounded font-medium text-left">Sync Now</button>
+        <span id="syncStatus" class="text-[10px] text-slate-400"></span>
+      </div>
     </div>
     <!-- Nav KPI blocks -->
     <div class="flex items-stretch gap-1.5 ml-3">
@@ -231,9 +235,8 @@
           <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
             <div>
               <h2 class="font-semibold text-slate-800 text-sm">AE Revenue Pool</h2>
-              <p class="text-xs text-slate-400 mt-0.5">Enter closed-won revenue only; quota is set once above</p>
+              <p class="text-xs text-slate-400 mt-0.5">Closed Won (USD) synced from BigQuery · <span id="poolSyncNote">—</span></p>
             </div>
-            <button onclick="addAE()" class="text-xs text-blue-600 hover:text-blue-700 border border-blue-200 px-2 py-1 rounded-lg">+ Add AE</button>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -302,6 +305,8 @@
       </div>
       <span class="text-xs bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-3 py-1">Manager / Leader View</span>
     </div>
+    <div id="syncLogPanel" class="hidden mb-4"></div>
+    <div id="regionQuotaPanel" class="hidden mb-4"></div>
     <p id="adminEmpty" class="text-slate-400 text-sm hidden">No SE profiles found yet.</p>
     <div id="adminDetail" class="hidden mb-4"></div>
     <div id="adminGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
@@ -513,6 +518,22 @@ function defaultPoolForProfile() {
   return [];
 }
 
+// ── Region model ───────────────────────────────────────
+// SEs carry their region's team number. BigQuery data (USD) is the source of
+// truth, stored per region in regionPools/{regionKey}_{quarter}.
+var REGION_KEYS   = ['UK', 'BigChange', 'US', 'ANZ', 'ClockShark'];
+var REGION_LABELS = { UK:'Simpro UK', BigChange:'BigChange', US:'Simpro US', ANZ:'Simpro ANZ', ClockShark:'ClockShark' };
+var DEFAULT_REGION_QUOTAS = { Q1:175008, Q2:226150, Q3:288083, Q4:295123 };
+
+// NZ folds into ANZ (BigQuery combines AU + NZ as "SimPro ANZ").
+function normRegion(r) { return r === 'NZ' ? 'ANZ' : (r || 'UK'); }
+
+function regionQuota(regionKey, q) {
+  var c = regionQuotaCfg[regionKey];
+  if (c && c.quotas && c.quotas[q] != null) return c.quotas[q];
+  return DEFAULT_REGION_QUOTAS[q] || (QUARTERS[q] ? QUARTERS[q].quota : 0);
+}
+
 // ── App state ──────────────────────────────────────────
 var currentUser = null;
 var profile = null;
@@ -520,6 +541,9 @@ var pool = [];
 var saveTimer = null;
 var adminProfilesCache = [];
 var adminPoolsCache = {};
+var regionQuotaCfg = {};       // regionKey -> { quotas:{Q1..Q4} }
+var regionPoolMeta = null;     // current SE's region pool doc (lastBqSync etc.)
+var adminRegionPoolsCache = {}; // regionKey -> region pool doc (Team View)
 
 // ── localStorage helpers ───────────────────────────────
 function lsGet(k)    { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; }
@@ -591,6 +615,41 @@ function fsGetPoolsForQuarter(q, callback) {
     .catch(function() { callback({}); });
 }
 
+// ── Region pools + config (BigQuery-sourced, USD) ──────────────────────────
+function fsGetRegionPool(regionKey, q, callback) {
+  db.collection('regionPools').doc(regionKey + '_' + q).get()
+    .then(function(doc) { callback(doc.exists ? doc.data() : null); })
+    .catch(function()   { callback(null); });
+}
+
+function fsGetRegionPoolsForQuarter(q, callback) {
+  db.collection('regionPools').where('quarter', '==', q).get()
+    .then(function(snapshot) {
+      var pools = {};
+      snapshot.forEach(function(doc) { var d = doc.data(); pools[d.region] = d; });
+      callback(pools);
+    })
+    .catch(function() { callback({}); });
+}
+
+function fsGetRegionConfig(callback) {
+  db.collection('regionConfig').get()
+    .then(function(snapshot) {
+      var cfg = {};
+      snapshot.forEach(function(doc) { cfg[doc.id] = doc.data(); });
+      callback(cfg);
+    })
+    .catch(function() { callback({}); });
+}
+
+function fsSetRegionQuotas(regionKey, quotas) {
+  return db.collection('regionConfig').doc(regionKey).set({
+    quotas:    quotas,
+    updatedBy: currentUser ? currentUser.email : '',
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+}
+
 function adminRosterProfiles(liveProfiles) {
   var profiles = (liveProfiles || []).slice();
   var seen = {};
@@ -622,19 +681,19 @@ function adminRosterProfiles(liveProfiles) {
   return profiles;
 }
 
-function adminProfileMetrics(p, q, pools) {
-  var quota = p.quotas ? (p.quotas[q] || QUARTERS[q].quota) : QUARTERS[q].quota;
+// Every SE carries their region's number (USD). Pool + total come from the
+// region pool synced from BigQuery; quota from the editable region config.
+function adminProfileMetrics(p, q) {
+  var regionKey = normRegion(p.region);
+  var quota = regionQuota(regionKey, q);
   var ote = p.quarterlyOTE || 0;
-  var sePool = pools[p.firebaseUid] || [];
-  var totCW = 0;
-  sePool.forEach(function(ae) { totCW += ae.cw || 0; });
-  var poolUSD = totCW * (p.fx || 1.0);
-  if (p.isRosterPlaceholder && p.sampleAtt && p.sampleAtt[q] !== null && p.sampleAtt[q] !== undefined) {
-    poolUSD = p.sampleAtt[q] * quota;
-    totCW = poolUSD / (p.fx || 1.0);
-  }
+  var rp = adminRegionPoolsCache[regionKey];
+  var sePool = (rp && rp.aes) ? rp.aes.map(function(a) {
+    return { name: a.name, cw: a.cwUSD || 0, type: a.type, aeRegion: a.aeRegion };
+  }) : [];
+  var poolUSD = rp ? (rp.totalCwUSD || 0) : 0;
   var res = payout(poolUSD, quota, ote);
-  return { quota: quota, ote: ote, sePool: sePool, totCW: totCW, poolUSD: poolUSD, res: res };
+  return { quota: quota, ote: ote, sePool: sePool, totCW: poolUSD, poolUSD: poolUSD, res: res, regionKey: regionKey };
 }
 
 // ── Helpers ────────────────────────────────────────────
@@ -816,44 +875,39 @@ function obFinish() {
 }
 
 // ── POOL ───────────────────────────────────────────────
+// The AE pool is now sourced (read-only) from the SE's region pool in
+// BigQuery. Amounts are USD. The SE's own OTE is still saved to their profile.
 function loadPool(callback) {
   var q = document.getElementById('qSel').value;
   callback = callback || function() {};
+  var regionKey = normRegion(profile.region);
 
-  if (currentUser && currentUser.firebaseUid) {
-    fsGetPool(currentUser.firebaseUid, q, function(saved) {
-      pool = saved || defaultPoolForProfile();
+  fsGetRegionConfig(function(cfg) {
+    regionQuotaCfg = cfg || {};
+    fsGetRegionPool(regionKey, q, function(rp) {
+      regionPoolMeta = rp;
+      pool = (rp && rp.aes) ? rp.aes.map(function(a) {
+        return {
+          name:     a.name,
+          cw:       a.cwUSD || 0,
+          type:     a.type || 'Territory',
+          status:   'active',
+          aeRegion: a.aeRegion || profileRegionName(profile.region)
+        };
+      }) : [];
       regionExpanded[profileRegionName(profile.region)] = true;
       callback();
     });
-  } else {
-    var saved = getPool(currentUser.uid, q);
-    pool = saved || defaultPoolForProfile();
-    regionExpanded[profileRegionName(profile.region)] = true;
-    callback();
-  }
+  });
 }
 
-function savePool() {
-  var q = document.getElementById('qSel').value;
-  if (currentUser && currentUser.firebaseUid) {
-    fsSetPool(currentUser.firebaseUid, q, pool).then(showToast);
-  } else {
-    setPool(currentUser.uid, q, pool);
-    showToast();
-  }
-}
-
+// SE profile (OTE) only — the AE pool is read-only and synced from BigQuery.
 function scheduleSave() {
   clearTimeout(saveTimer);
   document.getElementById('saveInd').textContent = 'Saving…';
   saveTimer = setTimeout(function() {
-    savePool();
     profile.annualOTE    = parseFloat(document.getElementById('annOTE').value) || 0;
     profile.quarterlyOTE = parseFloat(document.getElementById('qOTE').value) || 0;
-    profile.fx           = parseFloat(document.getElementById('fxRate').value) || 1.0;
-    var q = document.getElementById('qSel').value;
-    profile.quotas[q]    = parseFloat(document.getElementById('seQuota').value) || 0;
     if (currentUser && currentUser.firebaseUid) {
       fsSetProfile(currentUser.firebaseUid, profile);
     } else {
@@ -867,22 +921,25 @@ function scheduleSave() {
 function buildDashboard() {
   var q    = document.getElementById('qSel').value;
   var qd   = QUARTERS[q];
-  var sym  = profile.currency || '$';
-  var fx   = profile.fx || 1.0;
-  var quota = profile.quotas ? (profile.quotas[q] || qd.quota) : qd.quota;
+  var sym  = '$';                          // synced data is USD
+  var fx   = 1.0;
+  var regionKey = normRegion(profile.region);
+  var quota = regionQuota(regionKey, q);
   var ote  = profile.quarterlyOTE || 0;
 
-  // Settings panel
+  // Settings panel — OTE editable; quota & FX are region-derived (read-only).
   document.getElementById('annOTE').value  = profile.annualOTE || 0;
   document.getElementById('qOTE').value    = ote;
   document.getElementById('seQuota').value = quota;
   document.getElementById('fxRate').value  = fx;
+  document.getElementById('seQuota').disabled = true;
+  document.getElementById('fxRate').disabled  = true;
 
-  // Quarter reference
+  // Quarter reference (regional quotas)
   var ref = document.getElementById('quotaRef');
   ref.innerHTML = '';
   ['Q1','Q2','Q3','Q4'].forEach(function(qk) {
-    var qv = profile.quotas ? (profile.quotas[qk] || QUARTERS[qk].quota) : QUARTERS[qk].quota;
+    var qv = regionQuota(regionKey, qk);
     var active = qk === q;
     var row = document.createElement('div');
     row.className = 'flex justify-between py-1 px-1.5 rounded ' + (active ? 'bg-blue-50' : '');
@@ -892,9 +949,19 @@ function buildDashboard() {
   });
 
 
-  // Admin button
+  // Admin button + BQ sync controls
   if (currentUserIsAdmin()) {
     document.getElementById('btnAdmin').classList.remove('hidden');
+    document.getElementById('syncNowBtn').classList.remove('hidden');
+  }
+  loadSyncStatus();
+
+  // Region pool sync note
+  var noteEl = document.getElementById('poolSyncNote');
+  if (noteEl) {
+    var ts = (regionPoolMeta && regionPoolMeta.lastBqSync && regionPoolMeta.lastBqSync.toDate)
+      ? regionPoolMeta.lastBqSync.toDate() : null;
+    noteEl.textContent = ts ? ('synced ' + ts.toLocaleString()) : 'not yet synced';
   }
 
   // AE table
@@ -968,7 +1035,7 @@ function buildAETable(sym) {
       var emptyTd = document.createElement('td');
       emptyTd.colSpan = 4;
       emptyTd.className = 'px-8 py-2 text-xs text-slate-400 italic border-t border-slate-100 bg-white';
-      emptyTd.textContent = 'No AEs — use + Add AE to add one';
+      emptyTd.textContent = 'No Closed Won synced for this region this quarter';
       emptyTr.appendChild(emptyTd);
       tbody.appendChild(emptyTr);
       return;
@@ -977,91 +1044,27 @@ function buildAETable(sym) {
     regionAEs.forEach(function(ae) {
       var poolIdx = pool.indexOf(ae);
       var tr = document.createElement('tr');
-      tr.className = 'ae-hover border-t border-slate-100 bg-white' + (ae.status === 'ramp' ? ' bg-amber-50/40' : '');
+      tr.className = 'ae-hover border-t border-slate-100 bg-white';
 
+      // AE name (read-only — synced from BigQuery)
       var nameTd = document.createElement('td');
-      nameTd.className = 'px-4 py-1.5 pl-7';
-      var nameWrap = document.createElement('div');
-      nameWrap.className = 'flex items-center gap-1.5';
-      var nameInput = document.createElement('input');
-      nameInput.type = 'text';
-      nameInput.value = ae.name || '';
-      nameInput.setAttribute('data-idx', poolIdx);
-      nameInput.className = 'w-32 border border-transparent bg-transparent rounded px-1 py-0.5 text-sm text-slate-700 focus:bg-white focus:border-blue-300 focus:outline-none';
-      nameInput.addEventListener('input', function() {
-        var idx = parseInt(this.getAttribute('data-idx'));
-        pool[idx].name = this.value;
-        scheduleSave();
-      });
-      nameWrap.appendChild(nameInput);
-      if (ae.status === 'ramp') {
-        var rampBadge = document.createElement('span');
-        rampBadge.className = 'text-xs bg-amber-100 text-amber-600 px-1 rounded';
-        rampBadge.textContent = 'Ramp';
-        nameWrap.appendChild(rampBadge);
-      }
-      var delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.setAttribute('data-idx', poolIdx);
-      delBtn.className = 'text-xs text-slate-300 hover:text-red-500 px-1';
-      delBtn.textContent = '×';
-      delBtn.title = 'Remove AE';
-      delBtn.addEventListener('click', function(ev) {
-        ev.stopPropagation();
-        var idx = parseInt(this.getAttribute('data-idx'));
-        pool.splice(idx, 1);
-        buildAETable(sym);
-        recalc();
-        scheduleSave();
-      });
-      nameWrap.appendChild(delBtn);
-      nameTd.appendChild(nameWrap);
+      nameTd.className = 'px-4 py-1.5 pl-7 text-sm text-slate-700';
+      nameTd.textContent = ae.name || 'Unnamed AE';
       tr.appendChild(nameTd);
 
+      // Type
       var typeCell = document.createElement('td');
-      typeCell.className = 'px-2 py-1.5 text-center';
-      var typeSelect = document.createElement('select');
-      typeSelect.setAttribute('data-idx', poolIdx);
-      typeSelect.className = 'text-xs border border-slate-200 rounded px-1 py-0.5 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-300';
-      ['Strategic', 'Territory'].forEach(function(type) {
-        var opt = document.createElement('option');
-        opt.value = type;
-        opt.textContent = type[0];
-        if ((ae.type || 'Territory') === type) opt.selected = true;
-        typeSelect.appendChild(opt);
-      });
-      typeSelect.addEventListener('change', function() {
-        var idx = parseInt(this.getAttribute('data-idx'));
-        pool[idx].type = this.value;
-        scheduleSave();
-      });
-      typeCell.appendChild(typeSelect);
+      typeCell.className = 'px-2 py-1.5 text-center text-xs text-slate-500';
+      typeCell.textContent = (ae.type || 'Territory')[0];
       tr.appendChild(typeCell);
 
+      // Closed Won (USD, read-only)
       var cwCell = document.createElement('td');
-      cwCell.className = 'px-2 py-1.5';
-      var inputWrap = document.createElement('div');
-      inputWrap.className = 'relative';
-      var symSpan = document.createElement('span');
-      symSpan.className = 'absolute left-1.5 top-1.5 text-slate-400 text-xs';
-      symSpan.textContent = sym;
-      var inp = document.createElement('input');
-      inp.type = 'number';
-      inp.value = ae.cw || 0;
-      inp.min = 0;
-      inp.setAttribute('data-idx', poolIdx);
-      inp.className = 'input-cell w-24 pl-5 pr-1 py-1 text-xs font-mono rounded text-right ae-input';
-      inp.addEventListener('input', function() {
-        var idx = parseInt(this.getAttribute('data-idx'));
-        pool[idx].cw = parseFloat(this.value) || 0;
-        recalc();
-        scheduleSave();
-      });
-      inputWrap.appendChild(symSpan);
-      inputWrap.appendChild(inp);
-      cwCell.appendChild(inputWrap);
+      cwCell.className = 'px-2 py-1.5 text-right font-mono text-xs text-slate-700';
+      cwCell.textContent = sym + Math.round(ae.cw || 0).toLocaleString();
       tr.appendChild(cwCell);
 
+      // Quota %
       var attCell = document.createElement('td');
       attCell.className = 'px-2 py-1.5 text-center';
       var attSpan = document.createElement('span');
@@ -1085,21 +1088,152 @@ function addAE() {
   scheduleSave();
 }
 
-function doBigQueryPull() {
-  var t = document.getElementById('toast');
-  t.textContent = 'BigQuery import is not connected yet';
-  t.classList.remove('hidden');
-  setTimeout(function() { t.classList.add('hidden'); t.textContent = 'Saved \u2713'; }, 3000);
+function loadSyncStatus() {
+  db.collection('syncLog').doc('latest').get().then(function(doc) {
+    var el = document.getElementById('syncStatus');
+    if (!el) return;
+    if (!doc.exists) { el.textContent = 'Never synced'; return; }
+    var ts = doc.data().syncedAt ? doc.data().syncedAt.toDate() : null;
+    if (!ts) { el.textContent = 'Never synced'; return; }
+    var diff = Math.round((Date.now() - ts.getTime()) / 60000);
+    var label = diff < 60 ? diff + 'm ago'
+              : diff < 1440 ? Math.floor(diff / 60) + 'h ago'
+              : Math.floor(diff / 1440) + 'd ago';
+    el.textContent = 'Synced ' + label;
+  }).catch(function() {});
+}
+
+function doManualSync() {
+  if (!currentUserIsAdmin()) return;
+  var btn = document.getElementById('syncNowBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Syncing\u2026'; }
+  firebase.functions().httpsCallable('bqManualSync')({}).then(function(result) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Sync Now'; }
+    loadSyncStatus();
+    buildSyncPanel();
+    var t = document.getElementById('toast');
+    var d = result.data || {};
+    t.textContent = 'Sync complete \u2713 \u2014 ' + (d.regionsSynced || 0) + ' region(s) synced';
+    t.classList.remove('hidden');
+    setTimeout(function() { t.classList.add('hidden'); t.textContent = 'Saved \u2713'; }, 5000);
+  }).catch(function(err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Sync Now'; }
+    var t = document.getElementById('toast');
+    t.textContent = 'Sync failed: ' + err.message;
+    t.classList.remove('hidden');
+    setTimeout(function() { t.classList.add('hidden'); t.textContent = 'Saved \u2713'; }, 5000);
+  });
+}
+
+function buildSyncPanel() {
+  var panel = document.getElementById('syncLogPanel');
+  if (!panel || !currentUserIsAdmin()) return;
+  db.collection('syncLog').doc('latest').get().then(function(doc) {
+    while (panel.firstChild) panel.removeChild(panel.firstChild);
+    if (!doc.exists) { panel.classList.add('hidden'); return; }
+    var d = doc.data();
+    var ts = d.syncedAt ? d.syncedAt.toDate() : null;
+    var timeStr = ts ? ts.toLocaleString() : '\u2014';
+    panel.classList.remove('hidden');
+
+    var wrap = cel('div', 'bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 flex flex-wrap items-center gap-4 text-xs text-slate-600');
+    var left = cel('div', 'flex items-center gap-3 flex-wrap');
+    app(left,
+      ctxt('span', 'font-semibold text-slate-700', 'BQ Sync'),
+      ctxt('span', '', 'Last run: ' + timeStr),
+      ctxt('span', '', d.quarter || '\u2014'),
+      ctxt('span', 'text-green-700', (d.regionsSynced || []).length + ' region(s) synced'),
+      ctxt('span', 'text-slate-500', (d.aesAdded || []).length + ' AE row(s)'));
+
+    app(wrap, left);
+    panel.appendChild(wrap);
+  }).catch(function() { panel.classList.add('hidden'); });
+}
+
+// Admin-only per-region quarterly quota editor (USD).
+function buildRegionQuotaEditor() {
+  var panel = document.getElementById('regionQuotaPanel');
+  if (!panel || !currentUserIsAdmin()) return;
+  while (panel.firstChild) panel.removeChild(panel.firstChild);
+  panel.classList.remove('hidden');
+
+  var card = cel('div', 'bg-white border border-slate-200 rounded-xl p-4');
+  app(card, ctxt('h3', 'text-sm font-semibold text-slate-700 mb-3', 'Regional Quotas (USD) — editable'));
+
+  var table = document.createElement('table');
+  table.className = 'w-full text-xs';
+  var thead = document.createElement('thead');
+  var htr = document.createElement('tr');
+  htr.className = 'text-slate-400';
+  ['Region','Q1','Q2','Q3','Q4',''].forEach(function(h) {
+    var th = document.createElement('th');
+    th.className = 'px-2 py-1 text-left font-medium';
+    th.textContent = h;
+    htr.appendChild(th);
+  });
+  thead.appendChild(htr);
+  table.appendChild(thead);
+
+  var tbody = document.createElement('tbody');
+  REGION_KEYS.forEach(function(regionKey) {
+    var tr = document.createElement('tr');
+    tr.className = 'border-t border-slate-100';
+    var nameTd = ctxt('td', 'px-2 py-1.5 font-medium text-slate-700', REGION_LABELS[regionKey] || regionKey);
+    tr.appendChild(nameTd);
+
+    var inputs = {};
+    ['Q1','Q2','Q3','Q4'].forEach(function(qk) {
+      var td = document.createElement('td');
+      td.className = 'px-2 py-1.5';
+      var inp = document.createElement('input');
+      inp.type = 'number';
+      inp.min = 0;
+      inp.value = regionQuota(regionKey, qk);
+      inp.className = 'w-24 border border-slate-200 rounded px-1.5 py-1 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-blue-300';
+      inputs[qk] = inp;
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+
+    var saveTd = document.createElement('td');
+    saveTd.className = 'px-2 py-1.5';
+    var saveBtn = ctxt('button', 'text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded', 'Save');
+    saveBtn.type = 'button';
+    saveBtn.onclick = (function(rk, inps, btn) {
+      return function() {
+        var quotas = {
+          Q1: parseFloat(inps.Q1.value) || 0,
+          Q2: parseFloat(inps.Q2.value) || 0,
+          Q3: parseFloat(inps.Q3.value) || 0,
+          Q4: parseFloat(inps.Q4.value) || 0
+        };
+        btn.textContent = 'Saving…';
+        fsSetRegionQuotas(rk, quotas).then(function() {
+          regionQuotaCfg[rk] = { quotas: quotas };
+          btn.textContent = 'Saved ✓';
+          setTimeout(function() { btn.textContent = 'Save'; }, 2000);
+          buildAdminView();
+        }).catch(function() { btn.textContent = 'Error'; });
+      };
+    })(regionKey, inputs, saveBtn);
+    saveTd.appendChild(saveBtn);
+    tr.appendChild(saveTd);
+
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  card.appendChild(table);
+  panel.appendChild(card);
 }
 
 // ── RECALCULATE ────────────────────────────────────────
 function recalc() {
   var quota = parseFloat(document.getElementById('seQuota').value) || 0;
   var ote   = parseFloat(document.getElementById('qOTE').value) || 0;
-  var fx    = parseFloat(document.getElementById('fxRate').value) || 1.0;
+  var fx    = 1.0;                         // synced data is USD
   var q     = document.getElementById('qSel').value;
   var qd    = QUARTERS[q];
-  var sym   = profile ? (profile.currency || '$') : '$';
+  var sym   = '$';
 
   var totClosed = 0;
   pool.forEach(function(ae, i) {
@@ -1328,18 +1462,23 @@ function buildAdminView() {
     return;
   }
 
-  fsGetAllProfiles(function(profiles) {
-    fsGetPoolsForQuarter(q, function(pools) {
-      profiles = adminRosterProfiles(profiles);
-      adminProfilesCache = profiles;
-      adminPoolsCache = pools;
-      while (grid.firstChild) grid.removeChild(grid.firstChild);
-      if (!profiles.length) { empty.classList.remove('hidden'); return; }
+  buildSyncPanel();
+  buildRegionQuotaEditor();
 
-      profiles.forEach(function(p, idx) {
-        var metrics = adminProfileMetrics(p, q, pools);
-        var poolUSD = metrics.poolUSD;
-        var quota   = metrics.quota;
+  fsGetRegionConfig(function(cfg) {
+    regionQuotaCfg = cfg || {};
+    fsGetRegionPoolsForQuarter(q, function(regionPools) {
+      adminRegionPoolsCache = regionPools || {};
+      fsGetAllProfiles(function(profiles) {
+        profiles = adminRosterProfiles(profiles);
+        adminProfilesCache = profiles;
+        while (grid.firstChild) grid.removeChild(grid.firstChild);
+        if (!profiles.length) { empty.classList.remove('hidden'); return; }
+
+        profiles.forEach(function(p, idx) {
+          var metrics = adminProfileMetrics(p, q);
+          var poolUSD = metrics.poolUSD;
+          var quota   = metrics.quota;
         var res     = metrics.res;
         var attPct  = (res.att * 100).toFixed(1);
         var badge   = res.att >= 1   ? ['bg-green-100 text-green-700', 'Quota Hit \u2713']
@@ -1381,6 +1520,7 @@ function buildAdminView() {
 
         app(card, headerRow, statsWrap);
         grid.appendChild(card);
+        });
       });
     });
   });
@@ -1392,10 +1532,10 @@ function showAdminDetail(profileIdx) {
   var p = adminProfilesCache[profileIdx];
   if (!p) return;
 
-  var metrics = adminProfileMetrics(p, q, adminPoolsCache);
+  var metrics = adminProfileMetrics(p, q);
   var sePool = metrics.sePool;
-  var fx = p.fx || 1.0;
-  var sym = p.currency || '$';
+  var fx = 1.0;                            // region data is USD
+  var sym = '$';
   var quota = metrics.quota;
   var ote = metrics.ote;
   var poolUSD = metrics.poolUSD;
@@ -1473,12 +1613,14 @@ function showAdminDetail(profileIdx) {
 
   var quarterWrap = cel('div', 'grid grid-cols-2 md:grid-cols-4 gap-2 mt-4');
   ['Q1','Q2','Q3','Q4'].forEach(function(qk) {
-    var qv = p.quotas ? (p.quotas[qk] || QUARTERS[qk].quota) : QUARTERS[qk].quota;
+    var qv = regionQuota(metrics.regionKey, qk);
     quarterWrap.appendChild(adminKpiNode(qk + ' Quota', fmt(qv), qk === q ? 'Selected quarter' : 'Configured', qk === q ? 'text-blue-600' : 'text-slate-800'));
   });
 
   app(body, tableWrap, quarterWrap);
-  app(detail, header, kpis, body);
+  detail.appendChild(header);
+  detail.appendChild(kpis);
+  detail.appendChild(body);
   detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 

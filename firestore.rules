@@ -1,13 +1,17 @@
 rules_version = '2';
 
 // Data model (see firestore.indexes.json):
-//   /users/{uid}         — SE profile: displayName, region, OTE, quotas, fx, onboarded
-//   /aePools/{poolId}    — AE pool entry: seUid, quarter, pool array (name/type/target/cw)
+//   /users/{uid}              — SE profile: displayName, region, OTE, quotas, fx, onboarded
+//   /aePools/{poolId}         — legacy per-SE AE pool: seUid, quarter, aes[]
+//   /regionPools/{region_q}   — per-region AE pool from BigQuery (USD): aes[], totalCwUSD
+//   /regionConfig/{region}    — per-region team quotas (USD), admin-editable
+//   /syncLog/latest           — last BigQuery sync summary
 //
 // Auth: Firebase Google SSO — request.auth.uid is the Firebase UID,
 //       request.auth.token.email is the verified Google email.
 //
-// Admins/leaders can read all data (Team View).
+// Admins/leaders can read all data (Team View). regionPools are written only
+// by the Cloud Function (admin SDK, bypasses rules).
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -37,6 +41,27 @@ service cloud.firestore {
       allow create: if isOwner(uid);
       allow update: if isOwner(uid);
       allow delete: if false; // profiles are never deleted via the app
+    }
+
+    // ── Sync log (written by Cloud Functions, readable by admins) ──────────
+    match /syncLog/{docId} {
+      allow read:  if isAdmin();
+      allow write: if false;
+    }
+
+    // ── Region pools (written by Cloud Function from BigQuery) ─────────────
+    // Real Closed Won per region, in USD. Any signed-in user may read; only
+    // the Cloud Function (admin SDK) writes.
+    match /regionPools/{docId} {
+      allow read:  if isSignedIn();
+      allow write: if false;
+    }
+
+    // ── Region config (per-region team quotas, USD) ────────────────────────
+    // Any signed-in user may read; only admins edit quotas.
+    match /regionConfig/{docId} {
+      allow read:  if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // ── AE pools ───────────────────────────────────────────────────────────
