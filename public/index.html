@@ -697,8 +697,8 @@ function adminRosterProfiles(liveProfiles) {
     var key = String(p.email || p.displayName || '').toLowerCase();
     if (key) seen[key] = true;
   });
-  if (typeof SAMPLE_SES === 'undefined') return profiles;
-  SAMPLE_SES.forEach(function(se, idx) {
+  if (typeof SE_ROSTER === 'undefined') return profiles;
+  SE_ROSTER.forEach(function(se, idx) {
     var nameKey = String(se.name || '').toLowerCase();
     if (seen[nameKey]) return;
     profiles.push({
@@ -706,14 +706,9 @@ function adminRosterProfiles(liveProfiles) {
       displayName: se.name,
       email: 'Roster placeholder',
       region: se.region,
-      currency: se.currency,
-      fx: se.fx,
-      quarterlyOTE: se.quarterlyOTE,
-      quotas: se.quotas,
-      sampleAtt: se.att,
+      quarterlyOTE: se.quarterlyOTE || 0,
       title: se.title,
       manager: se.manager,
-      location: se.location,
       isRosterPlaceholder: true
     });
     seen[nameKey] = true;
@@ -744,7 +739,9 @@ function adminRegionMetrics(regionKey, q) {
   var aes = (rp && rp.aes) ? rp.aes : [];
   var poolUSD = rp ? (rp.totalCwUSD || 0) : 0;
   var att = quota > 0 ? roundUp2(poolUSD / quota) : 0;
-  var ses = (adminProfilesCache || []).filter(function(p) { return normRegion(p.region) === regionKey; });
+  var ses = (adminProfilesCache || []).filter(function(p) {
+    return normRegion(p.region) === regionKey && !isAdminEmail(p.email);
+  });
   var regionName = (rp && rp.regionName) ? rp.regionName : (REGION_LABELS[regionKey] || regionKey);
   return { regionKey: regionKey, regionName: regionName, quota: quota, poolUSD: poolUSD, att: att, aes: aes, ses: ses };
 }
@@ -1854,6 +1851,28 @@ function buildPayCurveChart(quota, ote, currentPoolUSD) {
 
 // ── SAMPLE REPORT ──────────────────────────────────────
 var rptChartInst = null;
+
+// Real global SE roster (region = app region code; brand+geo mapped). Used by
+// the Team View region drill-down. OTE omitted until provided (commission shows "—").
+var SE_ROSTER = [
+  { name:'Brad Towers',      region:'Global',     title:'Senior Director, Sales Engineering',     manager:'Pete Mansel' },
+  { name:'Austin Huddleson', region:'US',         title:'Sales Engineer, Technology Integration', manager:'Brad Towers' },
+  { name:'Carter Jones',     region:'US',         title:'Senior Sales Engineer',                  manager:'Brad Towers' },
+  { name:'Joseph Valdez',    region:'US',         title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'Sarah Sareh',      region:'US',         title:'Senior Sales Engineer',                  manager:'Brad Towers' },
+  { name:'Isabelle Schicht', region:'ClockShark', title:'Associate Sales Engineer',               manager:'Brad Towers' },
+  { name:'Ray Robinson',     region:'ClockShark', title:'Associate Sales Engineer',               manager:'Brad Towers' },
+  { name:'Adam Skinner',     region:'UK',         title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'Jason Passey',     region:'UK',         title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'Dave Shaw',        region:'BigChange',  title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'Lee Wilkinson',    region:'BigChange',  title:'Principal Sales Engineer',               manager:'Brad Towers' },
+  { name:'Matthew Beecham',  region:'BigChange',  title:'Associate Sales Engineer',               manager:'Brad Towers' },
+  { name:'Danielle Berson',  region:'BigChange',  title:'Pre-Sales Manager',                      manager:'Brad Towers' },
+  { name:'Roger Quinn',      region:'BigChange',  title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'Shane Rhodes',     region:'ANZ',        title:'Senior Sales Engineer',                  manager:'Brad Towers' },
+  { name:'Dylan Rhodes',     region:'ANZ',        title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'TBH (open role)',  region:'ANZ',        title:'Sales Engineer',                         manager:'Brad Towers' }
+];
 
 var SAMPLE_SES = [
   { name:'Thilo Schatz',     manager:'Pete Mansel',  title:'VP, Global Sales Engineering',          location:'California, US',    region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:60000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:1.05,Q2:1.12,Q3:1.08,Q4:null}             },
