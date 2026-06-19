@@ -152,6 +152,14 @@
     <!-- Hidden legacy IDs used by JS -->
     <span id="kpiOTE" class="hidden"></span>
     <div class="flex-1"></div>
+    <select id="dashRegion" onchange="onDashRegionChange()" class="hidden bg-slate-700 text-white text-xs px-2 py-1 rounded-lg border border-slate-600 focus:outline-none mr-1">
+      <option value="ALL">All Regions</option>
+      <option value="UK">Simpro UK</option>
+      <option value="BigChange">BigChange</option>
+      <option value="US">Simpro US</option>
+      <option value="ANZ">Simpro ANZ</option>
+      <option value="ClockShark">ClockShark</option>
+    </select>
     <select id="qSel" onchange="onQChange()" class="bg-slate-700 text-white text-xs px-2 py-1 rounded-lg border border-slate-600 focus:outline-none">
       <option value="Q1">Q1 2026</option>
       <option value="Q2">Q2 2026</option>
@@ -173,7 +181,7 @@
       <div class="w-52 flex-shrink-0 space-y-4">
 
         <!-- Settings -->
-        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+        <div id="compPlanCard" class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
           <h2 class="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-3">Comp Plan</h2>
           <div class="space-y-2.5">
             <div>
@@ -267,7 +275,7 @@
         </div>
 
         <!-- Pay Curve chart -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div id="payCurveCard" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div class="px-4 py-3 border-b border-slate-100">
             <h2 class="font-semibold text-slate-800 text-sm">Pay Curve — Current AE Pool: <span id="payCurveLabel">$0</span></h2>
             <p class="text-xs text-slate-400 mt-0.5">Commission payout vs. AE pool revenue · Linear from first dollar · Cap at 200% OTE</p>
@@ -281,13 +289,13 @@
       <div class="w-64 flex-shrink-0 space-y-4">
 
         <!-- Monthly Draw Breakdown -->
-        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+        <div id="drawCard" class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
           <h2 class="font-semibold text-slate-800 text-sm mb-3">Monthly Draw Breakdown</h2>
           <div id="drawCards" class="space-y-3"></div>
         </div>
 
         <!-- Threshold Calculator -->
-        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+        <div id="threshCard" class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
           <h2 class="font-semibold text-slate-800 text-sm mb-3">Threshold Calculator</h2>
           <div id="threshCards" class="space-y-2"></div>
         </div>
@@ -526,10 +534,29 @@ var DEFAULT_REGION_QUOTAS = { Q1:175008, Q2:226150, Q3:288083, Q4:295123 };
 // NZ folds into ANZ (BigQuery combines AU + NZ as "SimPro ANZ").
 function normRegion(r) { return r === 'NZ' ? 'ANZ' : (r || 'UK'); }
 
-// My Dashboard shows only the logged-in SE's own region (the global picture
-// lives in the Team View). Falls back to all regions if no profile yet.
+// What the dashboard is currently showing. Admins get a region selector
+// (incl. "ALL"); a regular SE always sees only their own region.
+function dashSelection() {
+  if (currentUserIsAdmin()) {
+    var el = document.getElementById('dashRegion');
+    return (el && el.value) ? el.value : 'ALL';
+  }
+  return profile ? profile.region : 'UK';
+}
+function dashIsAll() { return dashSelection() === 'ALL'; }
+
+// Region display names the AE pool groups by: all 5 for "ALL", else the one.
 function dashboardRegions() {
-  return profile ? [profileRegionName(profile.region)] : REGION_NAMES;
+  if (dashIsAll()) return REGION_NAMES;
+  return [profileRegionName(dashSelection())];
+}
+
+// Quota for the current dashboard view (combined across regions for "ALL").
+function dashQuota(q) {
+  if (dashIsAll()) {
+    return REGION_KEYS.reduce(function(sum, rk) { return sum + regionQuota(rk, q); }, 0);
+  }
+  return regionQuota(dashSelection(), q);
 }
 
 // The quarter that contains today's date (so the dashboard opens on live data).
@@ -908,24 +935,43 @@ function obFinish() {
 function loadPool(callback) {
   var q = document.getElementById('qSel').value;
   callback = callback || function() {};
-  var regionKey = normRegion(profile.region);
+
+  function mapAes(rp, fallbackName) {
+    return (rp && rp.aes) ? rp.aes.map(function(a) {
+      return {
+        name:     a.name,
+        cw:       a.cwUSD || 0,
+        type:     a.type || 'Territory',
+        status:   'active',
+        aeRegion: a.aeRegion || fallbackName
+      };
+    }) : [];
+  }
 
   fsGetRegionConfig(function(cfg) {
     regionQuotaCfg = cfg || {};
-    fsGetRegionPool(regionKey, q, function(rp) {
-      regionPoolMeta = rp;
-      pool = (rp && rp.aes) ? rp.aes.map(function(a) {
-        return {
-          name:     a.name,
-          cw:       a.cwUSD || 0,
-          type:     a.type || 'Territory',
-          status:   'active',
-          aeRegion: a.aeRegion || profileRegionName(profile.region)
-        };
-      }) : [];
-      regionExpanded[profileRegionName(profile.region)] = true;
-      callback();
-    });
+
+    if (dashIsAll()) {
+      // Global rollup — concatenate every region's AE pool.
+      fsGetRegionPoolsForQuarter(q, function(pools) {
+        regionPoolMeta = null;
+        pool = [];
+        REGION_KEYS.forEach(function(rk) {
+          var rp = pools[rk];
+          if (rp) pool = pool.concat(mapAes(rp, profileRegionName(rk)));
+          regionExpanded[profileRegionName(rk)] = true;
+        });
+        callback();
+      });
+    } else {
+      var regionKey = normRegion(dashSelection());
+      fsGetRegionPool(regionKey, q, function(rp) {
+        regionPoolMeta = rp;
+        pool = mapAes(rp, profileRegionName(regionKey));
+        regionExpanded[profileRegionName(regionKey)] = true;
+        callback();
+      });
+    }
   });
 }
 
@@ -951,8 +997,8 @@ function buildDashboard() {
   var qd   = QUARTERS[q];
   var sym  = '$';                          // synced data is USD
   var fx   = 1.0;
-  var regionKey = normRegion(profile.region);
-  var quota = regionQuota(regionKey, q);
+  var isAll = dashIsAll();
+  var quota = dashQuota(q);
   var ote  = profile.quarterlyOTE || 0;
 
   // Settings panel — OTE editable; quota & FX are region-derived (read-only).
@@ -963,11 +1009,11 @@ function buildDashboard() {
   document.getElementById('seQuota').disabled = true;
   document.getElementById('fxRate').disabled  = true;
 
-  // Quarter reference (regional quotas)
+  // Quarter reference (combined quota for "All", else the region's)
   var ref = document.getElementById('quotaRef');
   ref.innerHTML = '';
   ['Q1','Q2','Q3','Q4'].forEach(function(qk) {
-    var qv = regionQuota(regionKey, qk);
+    var qv = dashQuota(qk);
     var active = qk === q;
     var row = document.createElement('div');
     row.className = 'flex justify-between py-1 px-1.5 rounded ' + (active ? 'bg-blue-50' : '');
@@ -976,20 +1022,31 @@ function buildDashboard() {
     ref.appendChild(row);
   });
 
-
-  // Admin button + BQ sync controls
+  // Admin controls: region selector + Team View + Sync
   if (currentUserIsAdmin()) {
     document.getElementById('btnAdmin').classList.remove('hidden');
     document.getElementById('syncNowBtn').classList.remove('hidden');
+    document.getElementById('dashRegion').classList.remove('hidden');
   }
+
+  // Per-SE commission tools only make sense for a single region — hide on "All".
+  ['compPlanCard','payCurveCard','drawCard','threshCard'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', isAll);
+  });
+
   loadSyncStatus();
 
   // Region pool sync note
   var noteEl = document.getElementById('poolSyncNote');
   if (noteEl) {
-    var ts = (regionPoolMeta && regionPoolMeta.lastBqSync && regionPoolMeta.lastBqSync.toDate)
-      ? regionPoolMeta.lastBqSync.toDate() : null;
-    noteEl.textContent = ts ? ('synced ' + ts.toLocaleString()) : 'not yet synced';
+    if (isAll) {
+      noteEl.textContent = 'all regions';
+    } else {
+      var ts = (regionPoolMeta && regionPoolMeta.lastBqSync && regionPoolMeta.lastBqSync.toDate)
+        ? regionPoolMeta.lastBqSync.toDate() : null;
+      noteEl.textContent = ts ? ('synced ' + ts.toLocaleString()) : 'not yet synced';
+    }
   }
 
   // AE table
@@ -1311,8 +1368,9 @@ function recalc() {
   document.getElementById('kpiAttSub').textContent = fmt(poolUSD) + ' of ' + fmt(quota);
   document.getElementById('kpiAttBar').style.width = Math.min(att * 100, 100) + '%';
   document.getElementById('kpiAttBar').className = 'h-full rounded-full transition-all ' + barColor(att);
-  document.getElementById('kpiComm').textContent = fmt(pay);
-  document.getElementById('kpiOTE').textContent = fmt(ote);
+  // Commission $ is per-SE; not meaningful on the global "All Regions" rollup.
+  document.getElementById('kpiComm').textContent = dashIsAll() ? '—' : fmt(pay);
+  document.getElementById('kpiOTE').textContent = dashIsAll() ? '—' : fmt(ote);
 
   var badges = att >= 2   ? ['bg-purple-100 text-purple-700', '200%+ Cap 🚀']
              : att >= 1   ? ['bg-green-100 text-green-700',   'Quota Hit ✓']
@@ -1348,14 +1406,12 @@ function recalc() {
   var navToplineEl = document.getElementById('navKpiTopline');
   if (navToplineEl) navToplineEl.textContent = fmt(poolUSD);
 
-  // Monthly draws
-  buildDraws(poolUSD, quota, ote, qd);
-
-  // Threshold cards
-  buildThresh(quota, ote, poolUSD, fx, sym);
-
-  // Pay curve chart
-  buildPayCurveChart(quota, ote, poolUSD);
+  // Per-SE commission tools only render for a single region (hidden on "All").
+  if (!dashIsAll()) {
+    buildDraws(poolUSD, quota, ote, qd);
+    buildThresh(quota, ote, poolUSD, fx, sym);
+    buildPayCurveChart(quota, ote, poolUSD);
+  }
 }
 
 function buildDraws(poolUSD, quota, ote, qd) {
@@ -1439,6 +1495,12 @@ function onOTEChange() {
 }
 
 function onQChange() {
+  loadPool(function() {
+    buildDashboard();
+  });
+}
+
+function onDashRegionChange() {
   loadPool(function() {
     buildDashboard();
   });
