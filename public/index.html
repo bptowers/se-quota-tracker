@@ -526,6 +526,12 @@ var DEFAULT_REGION_QUOTAS = { Q1:175008, Q2:226150, Q3:288083, Q4:295123 };
 // NZ folds into ANZ (BigQuery combines AU + NZ as "SimPro ANZ").
 function normRegion(r) { return r === 'NZ' ? 'ANZ' : (r || 'UK'); }
 
+// My Dashboard shows only the logged-in SE's own region (the global picture
+// lives in the Team View). Falls back to all regions if no profile yet.
+function dashboardRegions() {
+  return profile ? [profileRegionName(profile.region)] : REGION_NAMES;
+}
+
 // The quarter that contains today's date (so the dashboard opens on live data).
 function currentQuarterKey() {
   var today = new Date().toISOString().slice(0, 10);
@@ -1006,7 +1012,7 @@ function buildAETable(sym) {
   var quota = profile && profile.quotas ? (profile.quotas[q] || QUARTERS[q].quota) : QUARTERS[q].quota;
   var fx = profile ? (profile.fx || 1.0) : 1.0;
 
-  REGION_NAMES.forEach(function(region, ri) {
+  dashboardRegions().forEach(function(region, ri) {
     var regionAEs = pool.filter(function(ae) {
       return (ae.aeRegion || 'Simpro UK') === region;
     });
@@ -1274,7 +1280,7 @@ function recalc() {
   });
 
   // Keep region header totals in sync
-  REGION_NAMES.forEach(function(region, ri) {
+  dashboardRegions().forEach(function(region, ri) {
     var rAEs = pool.filter(function(ae){ return (ae.aeRegion||'Simpro UK') === region; });
     var rCW = 0;
     rAEs.forEach(function(ae){ rCW += ae.cw||0; });
