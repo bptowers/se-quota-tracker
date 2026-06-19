@@ -299,10 +299,10 @@
   <div id="tabAdmin" class="hidden max-w-7xl mx-auto px-4 py-6">
     <div class="flex items-center justify-between gap-3 mb-4">
       <div>
-        <h2 class="text-lg font-bold text-slate-800">Team Overview</h2>
-        <p class="text-sm text-slate-400">Click an SE to drill into quota attainment detail.</p>
+        <h2 class="text-lg font-bold text-slate-800">Global Team Overview</h2>
+        <p class="text-sm text-slate-400">All regions and attainment. Click a region to drill into its AEs and SEs.</p>
       </div>
-      <span class="text-xs bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-3 py-1">Manager / Leader View</span>
+      <span class="text-xs bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-3 py-1">Global Leader View</span>
     </div>
     <div id="syncLogPanel" class="hidden mb-4"></div>
     <div id="regionQuotaPanel" class="hidden mb-4"></div>
@@ -701,6 +701,19 @@ function adminProfileMetrics(p, q) {
   var poolUSD = rp ? (rp.totalCwUSD || 0) : 0;
   var res = payout(poolUSD, quota, ote);
   return { quota: quota, ote: ote, sePool: sePool, totCW: poolUSD, poolUSD: poolUSD, res: res, regionKey: regionKey };
+}
+
+// Region-level metrics for the global Team View (no OTE needed — attainment
+// is the team number; commission is shown per-SE in the drill-down).
+function adminRegionMetrics(regionKey, q) {
+  var rp = adminRegionPoolsCache[regionKey];
+  var quota = regionQuota(regionKey, q);
+  var aes = (rp && rp.aes) ? rp.aes : [];
+  var poolUSD = rp ? (rp.totalCwUSD || 0) : 0;
+  var att = quota > 0 ? roundUp2(poolUSD / quota) : 0;
+  var ses = (adminProfilesCache || []).filter(function(p) { return normRegion(p.region) === regionKey; });
+  var regionName = (rp && rp.regionName) ? rp.regionName : (REGION_LABELS[regionKey] || regionKey);
+  return { regionKey: regionKey, regionName: regionName, quota: quota, poolUSD: poolUSD, att: att, aes: aes, ses: ses };
 }
 
 // ── Helpers ────────────────────────────────────────────
@@ -1477,76 +1490,58 @@ function buildAdminView() {
     fsGetRegionPoolsForQuarter(q, function(regionPools) {
       adminRegionPoolsCache = regionPools || {};
       fsGetAllProfiles(function(profiles) {
-        profiles = adminRosterProfiles(profiles);
-        adminProfilesCache = profiles;
+        adminProfilesCache = adminRosterProfiles(profiles);
         while (grid.firstChild) grid.removeChild(grid.firstChild);
-        if (!profiles.length) { empty.classList.remove('hidden'); return; }
 
-        profiles.forEach(function(p, idx) {
-          var metrics = adminProfileMetrics(p, q);
-          var poolUSD = metrics.poolUSD;
-          var quota   = metrics.quota;
-        var res     = metrics.res;
-        var attPct  = (res.att * 100).toFixed(1);
-        var badge   = res.att >= 1   ? ['bg-green-100 text-green-700', 'Quota Hit \u2713']
-                    : res.att >= 0.8 ? ['bg-blue-100 text-blue-700',   'On Track']
-                    :                  ['bg-slate-100 text-slate-600', 'Building'];
+        REGION_KEYS.forEach(function(regionKey) {
+          var m = adminRegionMetrics(regionKey, q);
+          var attPct = (m.att * 100).toFixed(1);
+          var badge  = m.att >= 1   ? ['bg-green-100 text-green-700', 'Quota Hit \u2713']
+                     : m.att >= 0.8 ? ['bg-blue-100 text-blue-700',   'On Track']
+                     :                ['bg-slate-100 text-slate-600', 'Building'];
 
-        var card = cel('button', 'text-left bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-blue-300');
-        card.type = 'button';
-        card.onclick = (function(i) {
-          return function() {
-            showAdminDetail(i);
-          };
-        })(idx);
+          var card = cel('button', 'text-left bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-blue-300');
+          card.type = 'button';
+          card.onclick = (function(rk) { return function() { showRegionDetail(rk); }; })(regionKey);
 
-        var headerRow = cel('div', 'flex items-start justify-between mb-3');
-        var nameDiv   = ctxt('div', 'font-semibold text-slate-800', p.displayName || p.email);
-        var metaDiv   = ctxt('div', 'text-xs text-slate-400 mt-0.5', (p.region || '\u2014') + ' \u00b7 ' + (p.isRosterPlaceholder ? 'Roster' : p.email));
-        var infoWrap  = cel('div');
-        app(infoWrap, nameDiv, metaDiv);
-        var badgeEl   = ctxt('span', 'text-xs font-semibold px-2 py-1 rounded-full ' + badge[0], badge[1]);
-        app(headerRow, infoWrap, badgeEl);
+          var headerRow = cel('div', 'flex items-start justify-between mb-3');
+          var nameDiv   = ctxt('div', 'font-semibold text-slate-800', m.regionName);
+          var metaDiv   = ctxt('div', 'text-xs text-slate-400 mt-0.5', m.aes.length + ' AEs \u00b7 ' + m.ses.length + ' SE' + (m.ses.length === 1 ? '' : 's'));
+          var infoWrap  = cel('div');
+          app(infoWrap, nameDiv, metaDiv);
+          var badgeEl   = ctxt('span', 'text-xs font-semibold px-2 py-1 rounded-full ' + badge[0], badge[1]);
+          app(headerRow, infoWrap, badgeEl);
 
-        var attRow    = cel('div', 'flex justify-between text-sm');
-        app(attRow, ctxt('span', 'text-slate-500', 'Attainment'), ctxt('span', 'font-bold', attPct + '%'));
+          var attRow = cel('div', 'flex justify-between text-sm');
+          app(attRow, ctxt('span', 'text-slate-500', 'Attainment'), ctxt('span', 'font-bold', attPct + '%'));
 
-        var barOuter  = cel('div', 'h-2 bg-slate-100 rounded-full overflow-hidden');
-        var barInner  = cel('div', 'h-full rounded-full ' + barColor(res.att));
-        barInner.style.width = Math.min(res.att * 100, 100) + '%';
-        barOuter.appendChild(barInner);
+          var barOuter = cel('div', 'h-2 bg-slate-100 rounded-full overflow-hidden');
+          var barInner = cel('div', 'h-full rounded-full ' + barColor(m.att));
+          barInner.style.width = Math.min(m.att * 100, 100) + '%';
+          barOuter.appendChild(barInner);
 
-        var footRow   = cel('div', 'flex justify-between text-xs text-slate-500');
-        app(footRow,
-          ctxt('span', '', fmt(poolUSD) + ' / ' + fmt(quota)),
-          ctxt('span', 'font-semibold', (p.isRosterPlaceholder ? 'Roster: ' : 'Est: ') + fmt(res.pay)));
+          var footRow = cel('div', 'flex justify-between text-xs text-slate-500');
+          app(footRow,
+            ctxt('span', '', fmt(m.poolUSD) + ' / ' + fmt(m.quota)),
+            ctxt('span', 'font-semibold text-blue-600', 'View region detail'));
 
-        var hintRow = ctxt('div', 'text-xs text-blue-600 font-medium pt-1', 'View SE detail');
-        var statsWrap = cel('div', 'space-y-2');
-        app(statsWrap, attRow, barOuter, footRow, hintRow);
+          var statsWrap = cel('div', 'space-y-2');
+          app(statsWrap, attRow, barOuter, footRow);
 
-        app(card, headerRow, statsWrap);
-        grid.appendChild(card);
+          app(card, headerRow, statsWrap);
+          grid.appendChild(card);
         });
       });
     });
   });
 }
 
-function showAdminDetail(profileIdx) {
+function showRegionDetail(regionKey) {
   var detail = document.getElementById('adminDetail');
   var q = document.getElementById('qSel').value;
-  var p = adminProfilesCache[profileIdx];
-  if (!p) return;
-
-  var metrics = adminProfileMetrics(p, q);
-  var sePool = metrics.sePool;
-  var fx = 1.0;                            // region data is USD
-  var sym = '$';
-  var quota = metrics.quota;
-  var ote = metrics.ote;
-  var poolUSD = metrics.poolUSD;
-  var res = metrics.res;
+  var m = adminRegionMetrics(regionKey, q);
+  var sym = '$';                           // region data is USD
+  var quota = m.quota, poolUSD = m.poolUSD, att = m.att;
   var gapToQuota = Math.max(0, quota - poolUSD);
   var gapToCap   = Math.max(0, quota * 2 - poolUSD);
 
@@ -1556,75 +1551,96 @@ function showAdminDetail(profileIdx) {
   var header = cel('div', 'px-5 py-4 bg-blue-50 border-b border-blue-100 flex items-start justify-between gap-4');
   var titleWrap = cel('div');
   app(titleWrap,
-    ctxt('div', 'text-xs uppercase tracking-wide text-blue-500 font-semibold', 'SE Detail · ' + q + ' 2026'),
-    ctxt('h3', 'text-lg font-bold text-slate-800 mt-0.5', p.displayName || p.email),
-    ctxt('div', 'text-sm text-slate-500 mt-0.5', (p.region || '—') + ' · ' + (p.isRosterPlaceholder ? 'Roster placeholder' : p.email)));
+    ctxt('div', 'text-xs uppercase tracking-wide text-blue-500 font-semibold', 'Region · ' + q + ' 2026'),
+    ctxt('h3', 'text-lg font-bold text-slate-800 mt-0.5', m.regionName),
+    ctxt('div', 'text-sm text-slate-500 mt-0.5', m.aes.length + ' AEs · ' + m.ses.length + ' SE' + (m.ses.length === 1 ? '' : 's') + ' assigned'));
   var closeBtn = ctxt('button', 'text-xs text-slate-500 hover:text-slate-800 border border-slate-200 bg-white rounded-lg px-2 py-1', 'Close');
   closeBtn.type = 'button';
-  closeBtn.onclick = function() {
-    detail.classList.add('hidden');
-    detail.innerHTML = '';
-  };
+  closeBtn.onclick = function() { detail.classList.add('hidden'); detail.innerHTML = ''; };
   app(header, titleWrap, closeBtn);
 
   var kpis = cel('div', 'grid grid-cols-2 md:grid-cols-5 gap-3 p-5 border-b border-slate-100');
   app(kpis,
-    adminKpiNode('Attainment', (res.att * 100).toFixed(1) + '%', fmt(poolUSD) + ' / ' + fmt(quota), attColor(res.att)),
-    adminKpiNode('Est. Commission', fmt(res.pay), 'Quarterly OTE ' + fmt(ote), 'text-slate-800'),
+    adminKpiNode('Attainment', (att * 100).toFixed(1) + '%', fmt(poolUSD) + ' / ' + fmt(quota), attColor(att)),
+    adminKpiNode('Closed Won', fmt(poolUSD), 'Team total (USD)', 'text-slate-800'),
+    adminKpiNode('Team Quota', fmt(quota), q + ' 2026', 'text-slate-800'),
     adminKpiNode('Gap to Quota', fmt(gapToQuota), '100% attainment', gapToQuota > 0 ? 'text-amber-600' : 'text-green-600'),
-    adminKpiNode('Gap to Cap', fmt(gapToCap), '200% cap', gapToCap > 0 ? 'text-slate-600' : 'text-green-600'),
-    adminKpiNode('AE Entries', String(sePool.length), p.isRosterPlaceholder ? 'Awaiting live onboarding' : 'Closed-won rows', 'text-slate-800'));
+    adminKpiNode('Gap to Cap', fmt(gapToCap), '200% cap', gapToCap > 0 ? 'text-slate-600' : 'text-green-600'));
 
-  var body = cel('div', 'p-5');
+  var body = cel('div', 'p-5 space-y-5');
+
+  // ── SEs assigned to this region (commission uses each SE's OTE) ──
+  var seWrap = cel('div');
+  app(seWrap, ctxt('h4', 'text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2', 'Sales Engineers'));
+  if (!m.ses.length) {
+    app(seWrap, ctxt('div', 'text-xs text-slate-400 italic border border-dashed border-slate-200 rounded-lg p-3',
+      'No SEs assigned to this region yet — send me the roster and they’ll appear here with their estimated commission.'));
+  } else {
+    var seTableWrap = cel('div', 'overflow-x-auto border border-slate-100 rounded-lg');
+    var seTable = cel('table', 'w-full text-sm');
+    var seHead = document.createElement('thead');
+    seHead.className = 'bg-slate-50';
+    seHead.innerHTML = '<tr>'
+      + '<th class="px-3 py-2 text-left text-xs font-medium text-slate-500">SE</th>'
+      + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">Quarterly OTE</th>'
+      + '<th class="px-3 py-2 text-center text-xs font-medium text-slate-500">Attainment</th>'
+      + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">Est. Commission</th></tr>';
+    seTable.appendChild(seHead);
+    var seBody = document.createElement('tbody');
+    m.ses.forEach(function(se) {
+      var ote = se.quarterlyOTE || 0;
+      var pay = payout(poolUSD, quota, ote).pay;
+      var tr = document.createElement('tr');
+      tr.className = 'border-t border-slate-100';
+      app(tr,
+        ctxt('td', 'px-3 py-2 text-slate-700', se.displayName || se.email || 'Unnamed SE'),
+        ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-700', ote ? fmt(ote) : '—'),
+        ctxt('td', 'px-3 py-2 text-center font-mono text-xs ' + attColor(att), (att * 100).toFixed(0) + '%'),
+        ctxt('td', 'px-3 py-2 text-right font-mono text-xs font-semibold text-slate-800', ote ? fmt(pay) : '—'));
+      seBody.appendChild(tr);
+    });
+    seTable.appendChild(seBody);
+    seTableWrap.appendChild(seTable);
+    seWrap.appendChild(seTableWrap);
+  }
+
+  // ── AE pool for this region (from BigQuery) ──
+  var aeWrap = cel('div');
+  app(aeWrap, ctxt('h4', 'text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2', 'AE Closed Won (from BigQuery)'));
   var tableWrap = cel('div', 'overflow-x-auto border border-slate-100 rounded-lg');
   var table = cel('table', 'w-full text-sm');
   var thead = document.createElement('thead');
   thead.className = 'bg-slate-50';
   thead.innerHTML = '<tr>'
     + '<th class="px-3 py-2 text-left text-xs font-medium text-slate-500">AE</th>'
-    + '<th class="px-3 py-2 text-center text-xs font-medium text-slate-500">Type</th>'
-    + '<th class="px-3 py-2 text-center text-xs font-medium text-slate-500">Region</th>'
-    + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">Closed Won</th>'
-    + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">USD</th>'
-    + '<th class="px-3 py-2 text-center text-xs font-medium text-slate-500">Quota %</th>'
-    + '</tr>';
+    + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">Closed Won (USD)</th>'
+    + '<th class="px-3 py-2 text-center text-xs font-medium text-slate-500">% of Quota</th></tr>';
   table.appendChild(thead);
   var tbody = document.createElement('tbody');
-  if (!sePool.length) {
+  if (!m.aes.length) {
     var emptyTr = document.createElement('tr');
-    var emptyTd = ctxt('td', 'px-3 py-4 text-center text-xs text-slate-400',
-      p.isRosterPlaceholder
-        ? 'Roster summary only. This SE has not onboarded live AE detail yet.'
-        : 'No AE closed-won entries for this quarter.');
-    emptyTd.colSpan = 6;
+    var emptyTd = ctxt('td', 'px-3 py-4 text-center text-xs text-slate-400', 'No Closed Won synced for this region this quarter.');
+    emptyTd.colSpan = 3;
     emptyTr.appendChild(emptyTd);
     tbody.appendChild(emptyTr);
   } else {
-    sePool.forEach(function(ae) {
-      var aeUSD = (ae.cw || 0) * fx;
-      var aeAtt = quota > 0 ? aeUSD / quota : 0;
+    m.aes.forEach(function(ae) {
+      var cw = ae.cwUSD || 0;
+      var aeAtt = quota > 0 ? cw / quota : 0;
       var tr = document.createElement('tr');
       tr.className = 'border-t border-slate-100';
       app(tr,
         ctxt('td', 'px-3 py-2 text-slate-700', ae.name || 'Unnamed AE'),
-        ctxt('td', 'px-3 py-2 text-center text-xs text-slate-500', ae.type || '—'),
-        ctxt('td', 'px-3 py-2 text-center text-xs text-slate-500', ae.aeRegion || '—'),
-        ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-700', sym + Math.round(ae.cw || 0).toLocaleString()),
-        ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-700', fmt(aeUSD)),
-        ctxt('td', 'px-3 py-2 text-center font-mono text-xs ' + attColor(aeAtt), Math.round(aeAtt * 100) + '%'));
+        ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-700', sym + Math.round(cw).toLocaleString()),
+        ctxt('td', 'px-3 py-2 text-center font-mono text-xs text-slate-500', (aeAtt * 100).toFixed(1) + '%'));
       tbody.appendChild(tr);
     });
   }
   table.appendChild(tbody);
   tableWrap.appendChild(table);
+  aeWrap.appendChild(tableWrap);
 
-  var quarterWrap = cel('div', 'grid grid-cols-2 md:grid-cols-4 gap-2 mt-4');
-  ['Q1','Q2','Q3','Q4'].forEach(function(qk) {
-    var qv = regionQuota(metrics.regionKey, qk);
-    quarterWrap.appendChild(adminKpiNode(qk + ' Quota', fmt(qv), qk === q ? 'Selected quarter' : 'Configured', qk === q ? 'text-blue-600' : 'text-slate-800'));
-  });
-
-  app(body, tableWrap, quarterWrap);
+  app(body, seWrap, aeWrap);
   detail.appendChild(header);
   detail.appendChild(kpis);
   detail.appendChild(body);
