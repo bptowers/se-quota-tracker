@@ -1,15 +1,23 @@
 'use strict';
 
-const functions  = require('firebase-functions');
-const admin      = require('firebase-admin');
+// 2nd-gen Cloud Functions (Cloud Run based — no App Engine dependency).
+const { onSchedule }        = require('firebase-functions/v2/scheduler');
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { setGlobalOptions }  = require('firebase-functions/v2');
+const admin       = require('firebase-admin');
 const { BigQuery } = require('@google-cloud/bigquery');
 
 admin.initializeApp();
 const db = admin.firestore();
 
-// BigQuery client — uses the Cloud Function's service account credentials.
-// The service account for project "se-quota-tracker" must be granted:
-//   BigQuery Data Viewer + BigQuery Job User on "edw-simprogroup-propagation".
+// All functions run in us-central1.
+setGlobalOptions({ region: 'us-central1' });
+
+// BigQuery client — uses the function's runtime service account credentials.
+// For 2nd-gen the runtime SA is the compute service account
+//   113593790107-compute@developer.gserviceaccount.com
+// which must be granted BigQuery Data Viewer + Job User on
+//   edw-simprogroup-propagation.
 const bq = new BigQuery();
 
 const BQ_TABLE = 'edw-simprogroup-propagation.sp_group.group_sales_opportunity';
@@ -136,16 +144,17 @@ function writeSyncLog(quarter, regionsSynced, aesAdded, totalRows) {
   });
 }
 
-// ── Scheduled: daily at 2 am UTC ─────────────────────────────────────────────
-exports.bqDailySync = functions
-  .pubsub.schedule('0 2 * * *')
-  .timeZone('UTC')
-  .onRun(async () => { await runSync(); });
+// ── Scheduled: daily at 2 am UTC (2nd-gen, uses Cloud Scheduler directly) ────
+exports.bqDailySync = onSchedule(
+  { schedule: '0 2 * * *', timeZone: 'UTC' },
+  async () => { await runSync(); }
+);
 
-// ── Callable: admin manual trigger ───────────────────────────────────────────
-exports.bqManualSync = functions.https.onCall(async (data, context) => {
-  if (!context.auth || !ADMIN_EMAILS.includes(context.auth.token.email)) {
-    throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+// ── Callable: admin manual trigger (2nd-gen) ─────────────────────────────────
+exports.bqManualSync = onCall(async (request) => {
+  const email = request.auth && request.auth.token && request.auth.token.email;
+  if (!email || !ADMIN_EMAILS.includes(email)) {
+    throw new HttpsError('permission-denied', 'Admin access required');
   }
   return runSync();
 });
