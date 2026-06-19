@@ -479,35 +479,35 @@ var QUARTERS = {
 };
 
 var DEFAULT_UK_AES = [
-  { id:'dom',    name:'Dom George',       type:'Strategic', target:15844, cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
-  { id:'mat',    name:'Mat Wray',         type:'Strategic', target:15844, cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
-  { id:'ricky',  name:'Ricky Campitelli', type:'Strategic', target:15844, cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
-  { id:'jake',   name:'Jake Beattie',     type:'Territory', target:6090,  cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
-  { id:'steven', name:'Steven Crake',     type:'Territory', target:6090,  cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
-  { id:'marc',   name:'Marc Rees',        type:'Territory', target:6090,  cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
-  { id:'david',  name:'David Taylor',     type:'Territory', target:6090,  cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
-  { id:'calum',  name:'Calum Radcliffe',  type:'Territory', target:6060,  cw:0, status:'active', aeRegion:'Simpro UK (VB)' },
-  { id:'simon',  name:'Simon Heath',      type:'Strategic', target:0,     cw:0, status:'ramp',   aeRegion:'Simpro UK (VB)' },
-  { id:'thomas', name:'Thomas Bennett',   type:'Strategic', target:0,     cw:0, status:'ramp',   aeRegion:'Simpro UK (VB)' }
+  { id:'dom',    name:'Dom George',       type:'Strategic', target:15844, cw:0, status:'active', aeRegion:'Simpro UK' },
+  { id:'mat',    name:'Mat Wray',         type:'Strategic', target:15844, cw:0, status:'active', aeRegion:'Simpro UK' },
+  { id:'ricky',  name:'Ricky Campitelli', type:'Strategic', target:15844, cw:0, status:'active', aeRegion:'Simpro UK' },
+  { id:'jake',   name:'Jake Beattie',     type:'Territory', target:6090,  cw:0, status:'active', aeRegion:'Simpro UK' },
+  { id:'steven', name:'Steven Crake',     type:'Territory', target:6090,  cw:0, status:'active', aeRegion:'Simpro UK' },
+  { id:'marc',   name:'Marc Rees',        type:'Territory', target:6090,  cw:0, status:'active', aeRegion:'Simpro UK' },
+  { id:'david',  name:'David Taylor',     type:'Territory', target:6090,  cw:0, status:'active', aeRegion:'Simpro UK' },
+  { id:'calum',  name:'Calum Radcliffe',  type:'Territory', target:6060,  cw:0, status:'active', aeRegion:'Simpro UK' },
+  { id:'simon',  name:'Simon Heath',      type:'Strategic', target:0,     cw:0, status:'ramp',   aeRegion:'Simpro UK' },
+  { id:'thomas', name:'Thomas Bennett',   type:'Strategic', target:0,     cw:0, status:'ramp',   aeRegion:'Simpro UK' }
 ];
 
-var REGION_NAMES = ['Simpro UK (VB)', 'BigChange UK', 'Simpro North America', 'Simpro ANZ', 'ClockShark North America'];
+var REGION_NAMES = ['Simpro UK', 'BigChange UK', 'Simpro North America', 'Simpro ANZ', 'ClockShark North America'];
 
 var regionExpanded = {
-  'Simpro UK (VB)': false, 'BigChange UK': false,
+  'Simpro UK': false, 'BigChange UK': false,
   'Simpro North America': false, 'Simpro ANZ': false,
   'ClockShark North America': false
 };
 
 function profileRegionName(region) {
   var map = {
-    UK: 'Simpro UK (VB)',
+    UK: 'Simpro UK',
     BigChange: 'BigChange UK',
     US: 'Simpro North America',
     ANZ: 'Simpro ANZ',
     ClockShark: 'ClockShark North America'
   };
-  return map[region] || 'Simpro UK (VB)';
+  return map[region] || 'Simpro UK';
 }
 
 function defaultPoolForProfile() {
@@ -525,6 +525,15 @@ var DEFAULT_REGION_QUOTAS = { Q1:175008, Q2:226150, Q3:288083, Q4:295123 };
 
 // NZ folds into ANZ (BigQuery combines AU + NZ as "SimPro ANZ").
 function normRegion(r) { return r === 'NZ' ? 'ANZ' : (r || 'UK'); }
+
+// The quarter that contains today's date (so the dashboard opens on live data).
+function currentQuarterKey() {
+  var today = new Date().toISOString().slice(0, 10);
+  for (var k in QUARTERS) {
+    if (today >= QUARTERS[k].start && today <= QUARTERS[k].end) return k;
+  }
+  return 'Q1';
+}
 
 function regionQuota(regionKey, q) {
   var c = regionQuotaCfg[regionKey];
@@ -747,6 +756,9 @@ function doLogin(email, name, firebaseUid) {
   document.getElementById('loginErr').classList.add('hidden');
   currentUser = { uid: uid(email), email: email, name: name, firebaseUid: firebaseUid || null };
 
+  // Open on the current quarter (where live data exists), not the first option.
+  document.getElementById('qSel').value = currentQuarterKey();
+
   if (firebaseUid) {
     fsGetProfile(firebaseUid, function(p) {
       if (!p || !p.onboarded) {
@@ -855,6 +867,7 @@ function obFinish() {
     onboarded: true,
     isAdmin: currentUserIsAdmin()
   };
+  document.getElementById('qSel').value = currentQuarterKey();
   if (currentUser.firebaseUid) {
     profile.firebaseUid = currentUser.firebaseUid;
     fsSetProfile(currentUser.firebaseUid, profile).then(function() {
@@ -982,7 +995,7 @@ function buildAETable(sym) {
 
   REGION_NAMES.forEach(function(region, ri) {
     var regionAEs = pool.filter(function(ae) {
-      return (ae.aeRegion || 'Simpro UK (VB)') === region;
+      return (ae.aeRegion || 'Simpro UK') === region;
     });
     var rCW = 0;
     regionAEs.forEach(function(ae) { rCW += ae.cw || 0; });
@@ -1249,7 +1262,7 @@ function recalc() {
 
   // Keep region header totals in sync
   REGION_NAMES.forEach(function(region, ri) {
-    var rAEs = pool.filter(function(ae){ return (ae.aeRegion||'Simpro UK (VB)') === region; });
+    var rAEs = pool.filter(function(ae){ return (ae.aeRegion||'Simpro UK') === region; });
     var rCW = 0;
     rAEs.forEach(function(ae){ rCW += ae.cw||0; });
     var rAtt = quota > 0 ? (rCW * fx) / quota : 0;

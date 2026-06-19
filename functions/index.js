@@ -38,7 +38,7 @@ const ADMIN_EMAILS = [
 // Maps an app profile.region to its BigQuery sales_region label and the
 // app-facing region name used on auto-added AE rows.
 const REGION_MAP = {
-  UK:         { bq: 'SimPro EU',     appName: 'Simpro UK (VB)' },
+  UK:         { bq: 'SimPro EU',     appName: 'Simpro UK' },
   BigChange:  { bq: 'BigChange EU',  appName: 'BigChange UK' },
   US:         { bq: 'SimPro NA',     appName: 'Simpro North America' },
   ANZ:        { bq: 'SimPro ANZ',    appName: 'Simpro ANZ' },
