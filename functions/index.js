@@ -22,12 +22,10 @@ const bq = new BigQuery();
 
 const BQ_TABLE = 'edw-simprogroup-propagation.sp_group.group_sales_opportunity';
 
-const QUARTERS = {
-  Q1: { start: '2026-01-01', end: '2026-03-31' },
-  Q2: { start: '2026-04-01', end: '2026-06-30' },
-  Q3: { start: '2026-07-01', end: '2026-09-30' },
-  Q4: { start: '2026-10-01', end: '2026-12-31' },
-};
+// Comp runs on monthly MRR. We sync every month of this year in one pass.
+const SYNC_YEAR  = '2026';
+const YEAR_START = SYNC_YEAR + '-01-01';
+const YEAR_END   = SYNC_YEAR + '-12-31';
 
 const ADMIN_EMAILS = [
   'brad.towers@simprogroup.com',
@@ -45,99 +43,90 @@ const REGION_MAP = {
   ClockShark: { bq: 'ClockShark NA', appName: 'ClockShark North America' },
 };
 
-function currentQuarter() {
-  const today = new Date().toISOString().slice(0, 10);
-  for (const [key, qd] of Object.entries(QUARTERS)) {
-    if (today >= qd.start && today <= qd.end) return { key, ...qd };
-  }
-  return null;
-}
-
 async function runSync() {
-  const qtr = currentQuarter();
-  if (!qtr) {
-    console.warn('No active quarter for today — skipping sync');
-    return { skipped: true };
-  }
+  console.log(`Starting BQ monthly region sync for ${SYNC_YEAR}`);
 
-  console.log(`Starting BQ region sync for ${qtr.key} (${qtr.start} → ${qtr.end})`);
-
-  // All BQ regions we sync (AroFlo deliberately excluded — no SEs there).
+  // BQ region label → app region key + display name (AroFlo excluded).
+  const bqToRegion = {};
+  Object.entries(REGION_MAP).forEach(([key, m]) => { bqToRegion[m.bq] = { key, appName: m.appName }; });
   const bqRegions = Object.values(REGION_MAP).map(m => m.bq);
 
-  // 1. Query BigQuery — total Closed Won MRR (USD) per AE (owner_name), per region.
+  // 1. One query: Closed Won MRR (USD) per AE, per region, per month of the year.
   const query = `
     SELECT
       sales_region,
       owner_name                              AS ae_name,
-      SUM(CAST(CW_MRR_amount_USD AS FLOAT64)) AS cw_usd,
-      COUNT(*)                                AS deal_count
+      FORMAT_DATE('%Y-%m', close_date)        AS month,
+      SUM(CAST(CW_MRR_amount_USD AS FLOAT64)) AS cw_usd
     FROM \`${BQ_TABLE}\`
     WHERE closed_won   = 1
       AND owner_name  IS NOT NULL
-      AND close_date >= @q_start
-      AND close_date <= @q_end
+      AND close_date >= @y_start
+      AND close_date <= @y_end
       AND sales_region IN UNNEST(@regions)
-    GROUP BY sales_region, owner_name
+    GROUP BY sales_region, owner_name, month
   `;
 
   const [rows] = await bq.query({
     query,
-    params: { q_start: qtr.start, q_end: qtr.end, regions: bqRegions },
-    types:  { q_start: 'STRING',  q_end: 'STRING', regions: ['STRING'] },
+    params: { y_start: YEAR_START, y_end: YEAR_END, regions: bqRegions },
+    types:  { y_start: 'STRING',   y_end: 'STRING', regions: ['STRING'] },
   });
 
-  console.log(`BQ returned ${rows.length} AE rows across ${bqRegions.length} region(s)`);
+  console.log(`BQ returned ${rows.length} AE-month rows`);
 
-  // 2. Group AE rows by BQ region.
-  const byBqRegion = {};
+  // 2. Group by app region key → month → AE list.
+  const byRegionMonth = {};
   for (const row of rows) {
-    const region = row.sales_region;
-    if (!byBqRegion[region]) byBqRegion[region] = [];
-    byBqRegion[region].push({
+    const r = bqToRegion[row.sales_region];
+    if (!r) continue;
+    const month = row.month;
+    (byRegionMonth[r.key] = byRegionMonth[r.key] || {});
+    (byRegionMonth[r.key][month] = byRegionMonth[r.key][month] || []);
+    byRegionMonth[r.key][month].push({
       name:  (row.ae_name || '').trim(),
       cwUSD: Number(row.cw_usd) || 0,
     });
   }
 
-  const regionsSynced = [];
-  const aesAdded      = [];
+  // 3. Write one regionPools doc per region per month with data: {regionKey}_{YYYY-MM}.
+  const monthsSet = {};
+  const regionsSet = {};
+  let docCount = 0, aeRowCount = 0;
 
-  // 3. Write one regionPools doc per app region (regionKey_quarter).
   for (const [regionKey, map] of Object.entries(REGION_MAP)) {
-    const aeRows = byBqRegion[map.bq] || [];
-    if (!aeRows.length) {
-      console.warn(`No BQ data for region "${map.bq}" (${regionKey}) this quarter`);
+    const months = byRegionMonth[regionKey] || {};
+    for (const [month, aeRows] of Object.entries(months)) {
+      const aes = aeRows
+        .sort((a, b) => b.cwUSD - a.cwUSD)
+        .map(r => ({ name: r.name, cwUSD: r.cwUSD, aeRegion: map.appName }));
+      await db.collection('regionPools').doc(`${regionKey}_${month}`).set({
+        region:     regionKey,
+        regionName: map.appName,
+        month,
+        aes,
+        totalCwUSD: aes.reduce((s, a) => s + a.cwUSD, 0),
+        lastBqSync: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      docCount++;
+      aeRowCount += aes.length;
+      monthsSet[month] = true;
+      regionsSet[regionKey] = true;
     }
-
-    const aes = aeRows
-      .sort((a, b) => b.cwUSD - a.cwUSD)
-      .map(r => ({ name: r.name, cwUSD: r.cwUSD, aeRegion: map.appName }));
-
-    aes.forEach(a => aesAdded.push(a.name));
-
-    await db.collection('regionPools').doc(`${regionKey}_${qtr.key}`).set({
-      region:     regionKey,
-      regionName: map.appName,
-      quarter:    qtr.key,
-      aes,
-      totalCwUSD: aes.reduce((s, a) => s + a.cwUSD, 0),
-      lastBqSync: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    regionsSynced.push(regionKey);
   }
 
-  await writeSyncLog(qtr.key, regionsSynced, aesAdded, rows.length);
+  const monthsSynced  = Object.keys(monthsSet).sort();
+  const regionsSynced = Object.keys(regionsSet);
+  await writeSyncLog(monthsSynced, regionsSynced, aeRowCount, rows.length);
 
-  console.log(`Sync done: ${regionsSynced.length} region pool(s) written, ${aesAdded.length} AE row(s)`);
-  return { regionsSynced: regionsSynced.length, aesSynced: aesAdded.length, quarter: qtr.key };
+  console.log(`Sync done: ${docCount} region-month pool(s), ${aeRowCount} AE row(s), months ${monthsSynced.join(', ')}`);
+  return { pools: docCount, aesSynced: aeRowCount, months: monthsSynced.length };
 }
 
-function writeSyncLog(quarter, regionsSynced, aesAdded, totalRows) {
+function writeSyncLog(monthsSynced, regionsSynced, aesAdded, totalRows) {
   return db.collection('syncLog').doc('latest').set({
-    syncedAt:   admin.firestore.FieldValue.serverTimestamp(),
-    quarter,
+    syncedAt:    admin.firestore.FieldValue.serverTimestamp(),
+    monthsSynced,
     regionsSynced,
     aesAdded,
     totalRows,

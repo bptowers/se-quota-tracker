@@ -87,7 +87,7 @@
 
     <!-- Step 3 -->
     <div id="obS3" class="hidden">
-      <p class="text-sm text-slate-500 mb-4">Quarterly team/regional quotas (<span id="obSym2">$</span>)</p>
+      <p class="text-sm text-slate-500 mb-4">Reference quotas — your real monthly targets are managed centrally (<span id="obSym2">$</span>)</p>
       <div class="grid grid-cols-2 gap-3 mb-6">
         <div><label class="text-xs text-slate-500">Q1</label><input id="obQ1" type="number" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
         <div><label class="text-xs text-slate-500">Q2</label><input id="obQ2" type="number" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
@@ -167,10 +167,18 @@
       <option value="ClockShark">ClockShark</option>
     </select>
     <select id="qSel" onchange="onQChange()" class="bg-slate-700 text-white text-xs px-2 py-1 rounded-lg border border-slate-600 focus:outline-none">
-      <option value="Q1">Q1 2026</option>
-      <option value="Q2">Q2 2026</option>
-      <option value="Q3">Q3 2026</option>
-      <option value="Q4">Q4 2026</option>
+      <option value="2026-01">Jan 2026</option>
+      <option value="2026-02">Feb 2026</option>
+      <option value="2026-03">Mar 2026</option>
+      <option value="2026-04">Apr 2026</option>
+      <option value="2026-05">May 2026</option>
+      <option value="2026-06">Jun 2026</option>
+      <option value="2026-07">Jul 2026</option>
+      <option value="2026-08">Aug 2026</option>
+      <option value="2026-09">Sep 2026</option>
+      <option value="2026-10">Oct 2026</option>
+      <option value="2026-11">Nov 2026</option>
+      <option value="2026-12">Dec 2026</option>
     </select>
     <button id="btnSE"    onclick="showTab('se')"    class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium ml-2">My Dashboard</button>
     <button id="btnAdmin"  onclick="showTab('admin')"  class="text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium hidden">Team View</button>
@@ -195,7 +203,7 @@
               <input id="annOTE" type="number" oninput="onOTEChange()" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
             <div>
-              <label class="text-[10px] text-slate-400 uppercase tracking-wide">Quarterly OTE</label>
+              <label class="text-[10px] text-slate-400 uppercase tracking-wide">Monthly OTE</label>
               <input id="qOTE" type="number" oninput="scheduleSave()" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
             <div>
@@ -211,7 +219,7 @@
 
         <!-- Quarter quotas -->
         <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
-          <h2 class="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-3">2026 Quotas</h2>
+          <h2 class="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-3">Monthly Quotas (2026)</h2>
           <div id="quotaRef" class="text-xs space-y-1"></div>
         </div>
       </div>
@@ -294,12 +302,6 @@
       <!-- RIGHT SIDEBAR -->
       <div class="w-64 flex-shrink-0 space-y-4">
 
-        <!-- Monthly Draw Breakdown -->
-        <div id="drawCard" class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
-          <h2 class="font-semibold text-slate-800 text-sm mb-3">Monthly Draw Breakdown</h2>
-          <div id="drawCards" class="space-y-3"></div>
-        </div>
-
         <!-- Threshold Calculator -->
         <div id="threshCard" class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
           <h2 class="font-semibold text-slate-800 text-sm mb-3">Threshold Calculator</h2>
@@ -367,10 +369,9 @@
             <tr>
               <th class="px-4 py-2.5 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">SE</th>
               <th class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Region</th>
-              <th class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Q1</th>
-              <th class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Q2</th>
-              <th class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Q3</th>
-              <th class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Q4</th>
+              <th id="rptCol0" class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">M1</th>
+              <th id="rptCol1" class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">M2</th>
+              <th id="rptCol2" class="px-3 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">M3</th>
               <th class="px-3 py-2.5 text-right text-xs font-medium text-slate-500 uppercase tracking-wide">YTD Comm.</th>
               <th class="px-4 py-2.5 text-center text-xs font-medium text-slate-500 uppercase tracking-wide">Status</th>
             </tr>
@@ -485,12 +486,22 @@ function hydrateProfile(p) {
   return p;
 }
 
-var QUARTERS = {
-  Q1: { quota:175008, months:['January','February','March'],    pay:['February','March','April'],    start:'2026-01-01', end:'2026-03-31', days:90 },
-  Q2: { quota:226150, months:['April','May','June'],            pay:['May','June','July'],           start:'2026-04-01', end:'2026-06-30', days:91 },
-  Q3: { quota:288083, months:['July','August','September'],     pay:['August','September','October'],start:'2026-07-01', end:'2026-09-30', days:92 },
-  Q4: { quota:295123, months:['October','November','December'], pay:['November','December','January'],start:'2026-10-01', end:'2026-12-31', days:92 }
+// Monthly period model (MRR-based comp). defaultQuota = old quarterly figure / 3.
+var MONTHS = {
+  '2026-01': { label:'Jan 2026', start:'2026-01-01', end:'2026-01-31', days:31, defaultQuota:58336 },
+  '2026-02': { label:'Feb 2026', start:'2026-02-01', end:'2026-02-28', days:28, defaultQuota:58336 },
+  '2026-03': { label:'Mar 2026', start:'2026-03-01', end:'2026-03-31', days:31, defaultQuota:58336 },
+  '2026-04': { label:'Apr 2026', start:'2026-04-01', end:'2026-04-30', days:30, defaultQuota:75383 },
+  '2026-05': { label:'May 2026', start:'2026-05-01', end:'2026-05-31', days:31, defaultQuota:75383 },
+  '2026-06': { label:'Jun 2026', start:'2026-06-01', end:'2026-06-30', days:30, defaultQuota:75383 },
+  '2026-07': { label:'Jul 2026', start:'2026-07-01', end:'2026-07-31', days:31, defaultQuota:96028 },
+  '2026-08': { label:'Aug 2026', start:'2026-08-01', end:'2026-08-31', days:31, defaultQuota:96028 },
+  '2026-09': { label:'Sep 2026', start:'2026-09-01', end:'2026-09-30', days:30, defaultQuota:96028 },
+  '2026-10': { label:'Oct 2026', start:'2026-10-01', end:'2026-10-31', days:31, defaultQuota:98374 },
+  '2026-11': { label:'Nov 2026', start:'2026-11-01', end:'2026-11-30', days:30, defaultQuota:98374 },
+  '2026-12': { label:'Dec 2026', start:'2026-12-01', end:'2026-12-31', days:31, defaultQuota:98374 }
 };
+var MONTH_KEYS = Object.keys(MONTHS);
 
 var DEFAULT_UK_AES = [
   { id:'dom',    name:'Dom George',       type:'Strategic', target:15844, cw:0, status:'active', aeRegion:'Simpro UK' },
@@ -535,7 +546,6 @@ function defaultPoolForProfile() {
 // truth, stored per region in regionPools/{regionKey}_{quarter}.
 var REGION_KEYS   = ['UK', 'BigChange', 'US', 'ANZ', 'ClockShark'];
 var REGION_LABELS = { UK:'Simpro UK', BigChange:'BigChange', US:'Simpro US', ANZ:'Simpro ANZ', ClockShark:'ClockShark' };
-var DEFAULT_REGION_QUOTAS = { Q1:175008, Q2:226150, Q3:288083, Q4:295123 };
 
 // NZ folds into ANZ (BigQuery combines AU + NZ as "SimPro ANZ").
 function normRegion(r) { return r === 'NZ' ? 'ANZ' : (r || 'UK'); }
@@ -579,19 +589,19 @@ function dashQuota(q) {
   return regionQuota(dashSelection(), q);
 }
 
-// The quarter that contains today's date (so the dashboard opens on live data).
+// The month that contains today's date (so the dashboard opens on live data).
 function currentQuarterKey() {
   var today = new Date().toISOString().slice(0, 10);
-  for (var k in QUARTERS) {
-    if (today >= QUARTERS[k].start && today <= QUARTERS[k].end) return k;
+  for (var k in MONTHS) {
+    if (today >= MONTHS[k].start && today <= MONTHS[k].end) return k;
   }
-  return 'Q1';
+  return MONTH_KEYS[0];
 }
 
-function regionQuota(regionKey, q) {
+function regionQuota(regionKey, m) {
   var c = regionQuotaCfg[regionKey];
-  if (c && c.quotas && c.quotas[q] != null) return c.quotas[q];
-  return DEFAULT_REGION_QUOTAS[q] || (QUARTERS[q] ? QUARTERS[q].quota : 0);
+  if (c && c.quotas && c.quotas[m] != null) return c.quotas[m];
+  return MONTHS[m] ? MONTHS[m].defaultQuota : 0;
 }
 
 // ── App state ──────────────────────────────────────────
@@ -682,8 +692,8 @@ function fsGetRegionPool(regionKey, q, callback) {
     .catch(function()   { callback(null); });
 }
 
-function fsGetRegionPoolsForQuarter(q, callback) {
-  db.collection('regionPools').where('quarter', '==', q).get()
+function fsGetRegionPoolsForQuarter(q, callback) {  // q is a month key (YYYY-MM)
+  db.collection('regionPools').where('month', '==', q).get()
     .then(function(snapshot) {
       var pools = {};
       snapshot.forEach(function(doc) { var d = doc.data(); pools[d.region] = d; });
@@ -1014,12 +1024,12 @@ function scheduleSave() {
 // ── DASHBOARD ──────────────────────────────────────────
 function buildDashboard() {
   var q    = document.getElementById('qSel').value;
-  var qd   = QUARTERS[q];
+  var qd   = MONTHS[q];
   var sym  = '$';                          // synced data is USD
   var fx   = 1.0;
   var isAll = dashIsAll();
   var quota = dashQuota(q);
-  var ote  = profile.quarterlyOTE || 0;
+  var ote  = Math.round((profile.annualOTE || 0) / 12);   // monthly OTE
 
   // Settings panel — OTE editable; quota & FX are region-derived (read-only).
   document.getElementById('annOTE').value  = profile.annualOTE || 0;
@@ -1029,15 +1039,15 @@ function buildDashboard() {
   document.getElementById('seQuota').disabled = true;
   document.getElementById('fxRate').disabled  = true;
 
-  // Quarter reference (combined quota for "All", else the region's)
+  // Monthly quota reference (combined quota for "All", else the region's)
   var ref = document.getElementById('quotaRef');
   ref.innerHTML = '';
-  ['Q1','Q2','Q3','Q4'].forEach(function(qk) {
-    var qv = dashQuota(qk);
-    var active = qk === q;
+  MONTH_KEYS.forEach(function(mk) {
+    var qv = dashQuota(mk);
+    var active = mk === q;
     var row = document.createElement('div');
     row.className = 'flex justify-between py-1 px-1.5 rounded ' + (active ? 'bg-blue-50' : '');
-    row.innerHTML = '<span class="' + (active ? 'text-blue-600 font-semibold' : 'text-slate-500') + '">' + qk + ' 2026' + (active ? ' ◀' : '') + '</span>'
+    row.innerHTML = '<span class="' + (active ? 'text-blue-600 font-semibold' : 'text-slate-500') + '">' + MONTHS[mk].label + (active ? ' ◀' : '') + '</span>'
       + '<span class="font-mono ' + (active ? 'text-blue-700 font-semibold' : 'text-slate-600') + '">$' + qv.toLocaleString() + '</span>';
     ref.appendChild(row);
   });
@@ -1058,7 +1068,7 @@ function buildDashboard() {
   }
 
   // Per-SE commission tools only make sense for a single region — hide on "All".
-  ['compPlanCard','payCurveCard','drawCard','threshCard'].forEach(function(id) {
+  ['compPlanCard','payCurveCard','threshCard'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.classList.toggle('hidden', isAll);
   });
@@ -1094,7 +1104,7 @@ function buildAETable(sym) {
   var tbody = document.getElementById('aeBody');
   while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
   var q = document.getElementById('qSel').value;
-  var quota = profile && profile.quotas ? (profile.quotas[q] || QUARTERS[q].quota) : QUARTERS[q].quota;
+  var quota = dashQuota(q);
   var fx = profile ? (profile.fx || 1.0) : 1.0;
 
   dashboardRegions().forEach(function(region, ri) {
@@ -1346,7 +1356,7 @@ function recalc() {
   var ote   = parseFloat(document.getElementById('qOTE').value) || 0;
   var fx    = 1.0;                         // synced data is USD
   var q     = document.getElementById('qSel').value;
-  var qd    = QUARTERS[q];
+  var qd    = MONTHS[q];
   var sym   = '$';
 
   var totClosed = 0;
@@ -1437,45 +1447,9 @@ function recalc() {
 
   // Per-SE commission tools only render for a single region (hidden on "All").
   if (!dashIsAll()) {
-    buildDraws(poolUSD, quota, ote, qd);
     buildThresh(quota, ote, poolUSD, fx, sym);
     buildPayCurveChart(quota, ote, poolUSD);
   }
-}
-
-function buildDraws(poolUSD, quota, ote, qd) {
-  var months = [
-    { name: qd.months[0], pay: qd.pay[0], cumUSD: poolUSD/3,   linQ: quota/3 },
-    { name: qd.months[1], pay: qd.pay[1], cumUSD: poolUSD*2/3, linQ: quota*2/3 },
-    { name: qd.months[2], pay: qd.pay[2], cumUSD: poolUSD,      linQ: quota, trueup: true }
-  ];
-  var cumPaid = 0;
-  var html = '';
-  months.forEach(function(m) {
-    var r = payout(m.cumUSD, m.linQ, ote);
-    var draw, badge, cls;
-    if (m.trueup) {
-      var full = payout(m.cumUSD, quota, ote);
-      draw = Math.max(0, full.pay - cumPaid);
-      badge = draw > 0 ? ['bg-blue-100 text-blue-700', 'True-up ✓'] : ['bg-slate-100 text-slate-500', 'No top-up'];
-      cls = 'border-2 border-blue-200 bg-blue-50';
-    } else {
-      draw = Math.max(0, r.pay - cumPaid);
-      cumPaid += draw;
-      badge = r.att >= 1   ? ['bg-green-100 text-green-700', 'Capped @ 100%']
-            : draw > 0     ? ['bg-blue-100 text-blue-700',   'Draw paid']
-            :                ['bg-slate-100 text-slate-500', 'No draw'];
-      cls = 'border border-slate-200';
-    }
-    html += '<div class="' + cls + ' rounded-lg p-3">'
-      + '<div class="flex items-center justify-between mb-1">'
-      + '<div><div class="font-semibold text-sm text-slate-700">' + m.name + (m.trueup ? ' <span class="text-blue-600 text-xs font-normal">True-up</span>' : '') + '</div>'
-      + '<div class="text-xs text-slate-400">Checkpoint: ' + fmt(m.linQ) + '</div></div>'
-      + '<div class="text-right"><div class="text-base font-bold ' + (m.trueup ? 'text-blue-700' : 'text-slate-800') + '">' + fmt(draw) + '</div>'
-      + '<span class="text-xs px-1.5 py-0.5 rounded ' + badge[0] + '">' + badge[1] + '</span></div></div>'
-      + '<div class="text-xs text-slate-400 mt-1">Pay by 30 ' + m.pay + '</div></div>';
-  });
-  document.getElementById('drawCards').innerHTML = html;
 }
 
 function buildThresh(quota, ote, poolUSD, fx, sym) {
@@ -1505,7 +1479,7 @@ function buildThresh(quota, ote, poolUSD, fx, sym) {
 
 function updateDays() {
   var q = document.getElementById('qSel').value;
-  var qd = QUARTERS[q];
+  var qd = MONTHS[q];
   var today = new Date();
   var start = new Date(qd.start), end = new Date(qd.end);
   var elapsed   = Math.max(0, Math.min(Math.round((today - start) / 86400000), qd.days));
@@ -1518,7 +1492,7 @@ function updateDays() {
 // ── EVENT HANDLERS ─────────────────────────────────────
 function onOTEChange() {
   var ann = parseFloat(document.getElementById('annOTE').value) || 0;
-  document.getElementById('qOTE').value = Math.round(ann / 4);
+  document.getElementById('qOTE').value = Math.round(ann / 12);   // monthly OTE
   recalc();
   scheduleSave();
 }
@@ -1702,7 +1676,7 @@ function showRegionDetail(regionKey) {
     seHead.className = 'bg-slate-50';
     seHead.innerHTML = '<tr>'
       + '<th class="px-3 py-2 text-left text-xs font-medium text-slate-500">SE</th>'
-      + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">Quarterly OTE</th>'
+      + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">Monthly OTE</th>'
       + '<th class="px-3 py-2 text-center text-xs font-medium text-slate-500">Attainment</th>'
       + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">Est. Commission</th></tr>';
     seTable.appendChild(seHead);
@@ -1950,18 +1924,37 @@ var SAMPLE_SES = [
   { name:'Shane Rhodes',     manager:'Brad Towers',  title:'Senior Sales Engineer',                 location:'Brisbane, AU',       region:'ANZ', currency:'A$',  fx:0.647, quarterlyOTE:45000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:1.01,Q2:1.05,Q3:0.99,Q4:null}             }
 ];
 
+// ── Report tab: monthly sample data derived from the quarterly SAMPLE_SES ──
+// (Sample/Demo view.) Months elapsed this year, and the 3 most recent.
+var RPT_TODAY = new Date().toISOString().slice(0, 10);
+var ELAPSED_MONTHS = MONTH_KEYS.filter(function(m) { return MONTHS[m].start <= RPT_TODAY; });
+if (!ELAPSED_MONTHS.length) ELAPSED_MONTHS = [MONTH_KEYS[0]];
+var RPT_MONTHS = ELAPSED_MONTHS.slice(-3);
+
+function monthQuarter(m) { return 'Q' + Math.ceil(parseInt(m.slice(5), 10) / 3); }
+function monthPosInQuarter(m) { return (parseInt(m.slice(5), 10) - 1) % 3; }
+// Derive a plausible monthly attainment from the SE's quarterly sample value.
+function seMonthAtt(se, m) {
+  var a = se.att[monthQuarter(m)];
+  if (a === null || a === undefined) return null;
+  var f = [0.95, 1.0, 1.05][monthPosInQuarter(m)];
+  return Math.round(a * f * 100) / 100;
+}
+function seMonthQuota(se, m) { return Math.round(se.quotas[monthQuarter(m)] / 3); }
+function seMonthlyOTE(se) { return Math.round((se.quarterlyOTE || 0) / 3); }
+
 function seYTD(se) {
   var total = 0;
-  ['Q1','Q2','Q3'].forEach(function(q) {
-    var a = se.att[q];
-    if (a !== null) total += payout(a * se.quotas[q], se.quotas[q], se.quarterlyOTE).pay;
+  ELAPSED_MONTHS.forEach(function(m) {
+    var a = seMonthAtt(se, m);
+    if (a !== null) total += payout(a * seMonthQuota(se, m), seMonthQuota(se, m), seMonthlyOTE(se)).pay;
   });
   return total;
 }
 
 function seLatestStatus(se) {
   var lastA = null;
-  ['Q1','Q2','Q3'].forEach(function(q) { if (se.att[q] !== null) lastA = se.att[q]; });
+  ELAPSED_MONTHS.forEach(function(m) { var a = seMonthAtt(se, m); if (a !== null) lastA = a; });
   if (lastA === null) return { cls:'bg-slate-100 text-slate-500',  label:'—'            };
   if (lastA >= 1)    return { cls:'bg-green-100 text-green-700',   label:'Quota Hit ✓'  };
   if (lastA >= 0.8)  return { cls:'bg-blue-100 text-blue-700',     label:'On Track'     };
@@ -1991,12 +1984,12 @@ function buildReportTab() {
   document.getElementById('rptDate').textContent =
     today.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
 
-  // ── Team KPIs
+  // ── Team KPIs (across elapsed months)
   var atQuota=0, totalComm=0, sumAtt=0, cntAtt=0;
   SAMPLE_SES.forEach(function(se) {
     totalComm += seYTD(se);
-    ['Q1','Q2','Q3'].forEach(function(q) {
-      var a = se.att[q];
+    ELAPSED_MONTHS.forEach(function(m) {
+      var a = seMonthAtt(se, m);
       if (a === null) return;
       sumAtt += a; cntAtt++;
       if (a >= 1) atQuota++;
@@ -2008,10 +2001,18 @@ function buildReportTab() {
   while (kpisEl.firstChild) kpisEl.removeChild(kpisEl.firstChild);
   app(kpisEl,
     mkKpiNode('Team Size',             SAMPLE_SES.length + ' SEs',               'FY 2026 sample',       'text-slate-800'),
-    mkKpiNode('Avg Attainment (YTD)',  Math.round(avgAtt * 100) + '%',           'Q1–Q3 combined',       avgAtt >= 1 ? 'text-green-600' : avgAtt >= 0.8 ? 'text-blue-600' : 'text-slate-600'),
-    mkKpiNode('Quarters at Quota',     atQuota + ' of ' + SAMPLE_SES.length*3,  'Q1–Q3 quarter-slots',  'text-blue-600'),
-    mkKpiNode('Total Est. Commission', fmt(totalComm),                           'YTD through Q3',       'text-slate-800')
+    mkKpiNode('Avg Attainment (YTD)',  Math.round(avgAtt * 100) + '%',           'Months elapsed',       avgAtt >= 1 ? 'text-green-600' : avgAtt >= 0.8 ? 'text-blue-600' : 'text-slate-600'),
+    mkKpiNode('Months at Quota',       atQuota + ' of ' + cntAtt,                'SE-month slots',       'text-blue-600'),
+    mkKpiNode('Total Est. Commission', fmt(totalComm),                           'YTD',                  'text-slate-800')
   );
+
+  // ── Month column headers (last 3 months)
+  RPT_MONTHS.forEach(function(m, i) {
+    var th = document.getElementById('rptCol' + i);
+    if (th) th.textContent = MONTHS[m].label;
+  });
+  var ct = document.getElementById('rptChartTitle');
+  if (ct) ct.textContent = 'Monthly Attainment by SE — last ' + RPT_MONTHS.length + ' months';
 
   // ── Chart
   buildReportChart();
@@ -2053,8 +2054,8 @@ function rebuildRptList(seList) {
       ctxt('div', 'text-xs text-slate-400 mt-0.5', se.location.split(', ')[0]));
     tr.appendChild(regionCell);
 
-    ['Q1','Q2','Q3','Q4'].forEach(function(q) {
-      var a = se.att[q];
+    RPT_MONTHS.forEach(function(m) {
+      var a = seMonthAtt(se, m);
       var td = cel('td', 'px-3 py-2.5 text-center');
       if (a === null) {
         td.className += ' text-xs text-slate-300';
@@ -2095,8 +2096,8 @@ function onRptFilter() {
   // Update chart title
   var chartTitle = document.getElementById('rptChartTitle');
   if (chartTitle) chartTitle.textContent = rptFilter
-    ? rptFilter + ' — Q1 · Q2 · Q3 Attainment'
-    : 'Quarterly Attainment by SE — Q1 · Q2 · Q3 actuals · Q4 pending';
+    ? rptFilter + ' — last ' + RPT_MONTHS.length + ' months'
+    : 'Monthly Attainment by SE — last ' + RPT_MONTHS.length + ' months';
 
   // Update table title
   var tableTitle = document.getElementById('rptTableTitle');
@@ -2151,19 +2152,19 @@ function buildSeCard(se, idx, ytd, st, avatarColors) {
       ytdBox));
   card.appendChild(header);
 
-  // ── Quarterly strips
-  var grid = cel('div', 'grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-slate-100');
-  ['Q1','Q2','Q3','Q4'].forEach(function(q) {
-    var a = se.att[q];
+  // ── Monthly strips (last 3 months)
+  var grid = cel('div', 'grid grid-cols-1 md:grid-cols-3 divide-x divide-y md:divide-y-0 divide-slate-100');
+  RPT_MONTHS.forEach(function(m) {
+    var a = seMonthAtt(se, m);
     var isPending = (a === null);
-    var qComm = isPending ? 0 : payout(a * se.quotas[q], se.quotas[q], se.quarterlyOTE).pay;
+    var qComm = isPending ? 0 : payout(a * seMonthQuota(se, m), seMonthQuota(se, m), seMonthlyOTE(se)).pay;
     var barW  = isPending ? 0 : Math.round(Math.min(a, 1.0) * 100);
 
     var strip = cel('div', 'p-3.5' + (isPending ? ' bg-slate-50/70' : ''));
 
     var stripHdr = cel('div', 'flex items-center justify-between mb-2');
     app(stripHdr,
-      ctxt('span', 'text-xs font-semibold text-slate-600', q + ' 2026'),
+      ctxt('span', 'text-xs font-semibold text-slate-600', MONTHS[m].label),
       isPending
         ? ctxt('span', 'text-xs text-slate-300 italic', 'Pending')
         : ctxt('span', 'text-xs font-mono font-bold ' + attColor(a), Math.round(a * 100) + '%'));
@@ -2193,12 +2194,12 @@ function buildReportChart(seList) {
     { bg:'rgba(16,185,129,0.75)',  border:'rgb(16,185,129)' },
     { bg:'rgba(245,158,11,0.75)',  border:'rgb(245,158,11)' }
   ];
-  var datasets = ['Q1','Q2','Q3'].map(function(q, i) {
+  var datasets = RPT_MONTHS.map(function(m, i) {
     return {
-      label: q + ' 2026',
-      data: seList.map(function(se){ return se.att[q] !== null ? Math.round(se.att[q] * 100) : null; }),
-      backgroundColor: qColors[i].bg,
-      borderColor:     qColors[i].border,
+      label: MONTHS[m].label,
+      data: seList.map(function(se){ var a = seMonthAtt(se, m); return a !== null ? Math.round(a * 100) : null; }),
+      backgroundColor: qColors[i % qColors.length].bg,
+      borderColor:     qColors[i % qColors.length].border,
       borderWidth: 1,
       borderRadius: 4
     };
