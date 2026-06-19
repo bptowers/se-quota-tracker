@@ -152,6 +152,12 @@
     <!-- Hidden legacy IDs used by JS -->
     <span id="kpiOTE" class="hidden"></span>
     <div class="flex-1"></div>
+    <select id="viewAs" onchange="onViewAsChange()" class="hidden bg-slate-700 text-amber-300 text-xs px-2 py-1 rounded-lg border border-slate-600 focus:outline-none mr-1">
+      <option value="admin">View: Global Admin</option>
+      <option value="leader">View: Global Leader</option>
+      <option value="ic">View: Individual Contributor</option>
+    </select>
+    <select id="icSE" onchange="onIcSeChange()" class="hidden bg-slate-700 text-white text-xs px-2 py-1 rounded-lg border border-slate-600 focus:outline-none mr-1"></select>
     <select id="dashRegion" onchange="onDashRegionChange()" class="hidden bg-slate-700 text-white text-xs px-2 py-1 rounded-lg border border-slate-600 focus:outline-none mr-1">
       <option value="ALL">All Regions</option>
       <option value="UK">Simpro UK</option>
@@ -534,12 +540,26 @@ var DEFAULT_REGION_QUOTAS = { Q1:175008, Q2:226150, Q3:288083, Q4:295123 };
 // NZ folds into ANZ (BigQuery combines AU + NZ as "SimPro ANZ").
 function normRegion(r) { return r === 'NZ' ? 'ANZ' : (r || 'UK'); }
 
-// What the dashboard is currently showing. Admins get a region selector
-// (incl. "ALL"); a regular SE always sees only their own region.
+// ── "View as" role switcher (admin-only preview of each perspective) ───────
+var viewAs = 'admin';  // 'admin' | 'leader' | 'ic' — only meaningful for admins
+function effectiveRole() { return currentUserIsAdmin() ? viewAs : 'ic'; }
+function isAdminView()    { return currentUserIsAdmin() && viewAs === 'admin'; }
+function seesAllRegions() { return currentUserIsAdmin() && (viewAs === 'admin' || viewAs === 'leader'); }
+function isICView()       { return effectiveRole() === 'ic'; }
+
+// What the dashboard is currently showing.
+// Admin/Leader: the region selector (incl. "ALL"). IC: the chosen SE's region.
+// Regular SE: their own region.
 function dashSelection() {
-  if (currentUserIsAdmin()) {
+  if (seesAllRegions()) {
     var el = document.getElementById('dashRegion');
     return (el && el.value) ? el.value : 'ALL';
+  }
+  if (currentUserIsAdmin() && viewAs === 'ic') {
+    var se = document.getElementById('icSE');
+    var name = se && se.value;
+    var match = (typeof SE_ROSTER !== 'undefined') && SE_ROSTER.filter(function(s){ return s.name === name; })[0];
+    return match ? match.region : 'UK';
   }
   return profile ? profile.region : 'UK';
 }
@@ -973,7 +993,10 @@ function loadPool(callback) {
 }
 
 // SE profile (OTE) only — the AE pool is read-only and synced from BigQuery.
+// For admins, every dashboard view is a preview (incl. "view as SE"), so OTE
+// edits are display-only and never overwrite the stored profile.
 function scheduleSave() {
+  if (currentUserIsAdmin()) return;   // preview-only; nothing persisted
   clearTimeout(saveTimer);
   document.getElementById('saveInd').textContent = 'Saving…';
   saveTimer = setTimeout(function() {
@@ -1019,11 +1042,19 @@ function buildDashboard() {
     ref.appendChild(row);
   });
 
-  // Admin controls: region selector + Team View + Sync
+  // Admin "View as" switcher + role-gated controls.
   if (currentUserIsAdmin()) {
-    document.getElementById('btnAdmin').classList.remove('hidden');
-    document.getElementById('syncNowBtn').classList.remove('hidden');
-    document.getElementById('dashRegion').classList.remove('hidden');
+    var vsEl = document.getElementById('viewAs');
+    vsEl.classList.remove('hidden');
+    vsEl.value = viewAs;
+    populateIcPicker();
+    document.getElementById('icSE').classList.toggle('hidden', viewAs !== 'ic');
+    // Team View + Report + region selector: Admin & Leader (all-regions views)
+    document.getElementById('btnAdmin').classList.toggle('hidden',  !seesAllRegions());
+    document.getElementById('btnReport').classList.toggle('hidden', !seesAllRegions());
+    document.getElementById('dashRegion').classList.toggle('hidden', !seesAllRegions());
+    // Sync Now: Admin only (editing capability)
+    document.getElementById('syncNowBtn').classList.toggle('hidden', !isAdminView());
   }
 
   // Per-SE commission tools only make sense for a single region — hide on "All".
@@ -1232,11 +1263,12 @@ function buildSyncPanel() {
   }).catch(function() { panel.classList.add('hidden'); });
 }
 
-// Admin-only per-region quarterly quota editor (USD).
+// Admin-only per-region quarterly quota editor (USD). Hidden for Leader view.
 function buildRegionQuotaEditor() {
   var panel = document.getElementById('regionQuotaPanel');
-  if (!panel || !currentUserIsAdmin()) return;
+  if (!panel) return;
   while (panel.firstChild) panel.removeChild(panel.firstChild);
+  if (!isAdminView()) { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
 
   var card = cel('div', 'bg-white border border-slate-200 rounded-xl p-4');
@@ -1503,6 +1535,29 @@ function onDashRegionChange() {
   });
 }
 
+// Fill the IC "view as SE" picker once, with real regional SEs (not the global lead).
+function populateIcPicker() {
+  var sel = document.getElementById('icSE');
+  if (!sel || sel.options.length || typeof SE_ROSTER === 'undefined') return;
+  SE_ROSTER.filter(function(s) { return s.region !== 'Global'; }).forEach(function(s) {
+    var o = document.createElement('option');
+    o.value = s.name;
+    o.textContent = s.name + ' — ' + (REGION_LABELS[s.region] || s.region);
+    sel.appendChild(o);
+  });
+}
+
+function onViewAsChange() {
+  viewAs = document.getElementById('viewAs').value;
+  populateIcPicker();
+  if (viewAs === 'ic') showTab('se');   // IC has no Team View / Report
+  loadPool(function() { buildDashboard(); });
+}
+
+function onIcSeChange() {
+  loadPool(function() { buildDashboard(); });
+}
+
 function showTab(t) {
   document.getElementById('tabSE').classList.toggle('hidden',     t !== 'se');
   document.getElementById('tabAdmin').classList.toggle('hidden',  t !== 'admin');
@@ -1514,7 +1569,7 @@ function showTab(t) {
 
   var btnAdmin = document.getElementById('btnAdmin');
   var btnReport = document.getElementById('btnReport');
-  if (currentUserIsAdmin()) {
+  if (seesAllRegions()) {
     btnAdmin.className = t === 'admin' ? active : inactive;
     btnReport.className = t === 'report' ? active : inactive;
     btnAdmin.classList.remove('hidden');
