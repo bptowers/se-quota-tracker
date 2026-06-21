@@ -1707,8 +1707,7 @@ function showRegionDetail(regionKey) {
   thead.className = 'bg-slate-50';
   thead.innerHTML = '<tr>'
     + '<th class="px-3 py-2 text-left text-xs font-medium text-slate-500">AE</th>'
-    + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">Closed Won (USD)</th>'
-    + '<th class="px-3 py-2 text-center text-xs font-medium text-slate-500">% of Quota</th></tr>';
+    + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">Closed Won (USD)</th></tr>';
   table.appendChild(thead);
   var tbody = document.createElement('tbody');
   if (!m.aes.length) {
@@ -1720,13 +1719,11 @@ function showRegionDetail(regionKey) {
   } else {
     m.aes.forEach(function(ae) {
       var cw = ae.cwUSD || 0;
-      var aeAtt = quota > 0 ? cw / quota : 0;
       var tr = document.createElement('tr');
       tr.className = 'border-t border-slate-100';
       app(tr,
         ctxt('td', 'px-3 py-2 text-slate-700', ae.name || 'Unnamed AE'),
-        ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-700', sym + Math.round(cw).toLocaleString()),
-        ctxt('td', 'px-3 py-2 text-center font-mono text-xs text-slate-500', (aeAtt * 100).toFixed(1) + '%'));
+        ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-700', sym + Math.round(cw).toLocaleString()));
       tbody.appendChild(tr);
     });
   }
