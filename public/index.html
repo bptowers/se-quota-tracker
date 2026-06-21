@@ -486,20 +486,20 @@ function hydrateProfile(p) {
   return p;
 }
 
-// Monthly period model (MRR-based comp). defaultQuota = old quarterly figure / 3.
+// Monthly period model (MRR-based comp).
 var MONTHS = {
-  '2026-01': { label:'Jan 2026', start:'2026-01-01', end:'2026-01-31', days:31, defaultQuota:58336 },
-  '2026-02': { label:'Feb 2026', start:'2026-02-01', end:'2026-02-28', days:28, defaultQuota:58336 },
-  '2026-03': { label:'Mar 2026', start:'2026-03-01', end:'2026-03-31', days:31, defaultQuota:58336 },
-  '2026-04': { label:'Apr 2026', start:'2026-04-01', end:'2026-04-30', days:30, defaultQuota:75383 },
-  '2026-05': { label:'May 2026', start:'2026-05-01', end:'2026-05-31', days:31, defaultQuota:75383 },
-  '2026-06': { label:'Jun 2026', start:'2026-06-01', end:'2026-06-30', days:30, defaultQuota:75383 },
-  '2026-07': { label:'Jul 2026', start:'2026-07-01', end:'2026-07-31', days:31, defaultQuota:96028 },
-  '2026-08': { label:'Aug 2026', start:'2026-08-01', end:'2026-08-31', days:31, defaultQuota:96028 },
-  '2026-09': { label:'Sep 2026', start:'2026-09-01', end:'2026-09-30', days:30, defaultQuota:96028 },
-  '2026-10': { label:'Oct 2026', start:'2026-10-01', end:'2026-10-31', days:31, defaultQuota:98374 },
-  '2026-11': { label:'Nov 2026', start:'2026-11-01', end:'2026-11-30', days:30, defaultQuota:98374 },
-  '2026-12': { label:'Dec 2026', start:'2026-12-01', end:'2026-12-31', days:31, defaultQuota:98374 }
+  '2026-01': { label:'Jan 2026', start:'2026-01-01', end:'2026-01-31', days:31 },
+  '2026-02': { label:'Feb 2026', start:'2026-02-01', end:'2026-02-28', days:28 },
+  '2026-03': { label:'Mar 2026', start:'2026-03-01', end:'2026-03-31', days:31 },
+  '2026-04': { label:'Apr 2026', start:'2026-04-01', end:'2026-04-30', days:30 },
+  '2026-05': { label:'May 2026', start:'2026-05-01', end:'2026-05-31', days:31 },
+  '2026-06': { label:'Jun 2026', start:'2026-06-01', end:'2026-06-30', days:30 },
+  '2026-07': { label:'Jul 2026', start:'2026-07-01', end:'2026-07-31', days:31 },
+  '2026-08': { label:'Aug 2026', start:'2026-08-01', end:'2026-08-31', days:31 },
+  '2026-09': { label:'Sep 2026', start:'2026-09-01', end:'2026-09-30', days:30 },
+  '2026-10': { label:'Oct 2026', start:'2026-10-01', end:'2026-10-31', days:31 },
+  '2026-11': { label:'Nov 2026', start:'2026-11-01', end:'2026-11-30', days:30 },
+  '2026-12': { label:'Dec 2026', start:'2026-12-01', end:'2026-12-31', days:31 }
 };
 var MONTH_KEYS = Object.keys(MONTHS);
 
@@ -611,7 +611,7 @@ function currentQuarterKey() {
 function regionQuota(regionKey, m) {
   var c = regionQuotaCfg[regionKey];
   if (c && c.quotas && c.quotas[m] != null) return c.quotas[m];
-  return MONTHS[m] ? MONTHS[m].defaultQuota : 0;
+  return 0;
 }
 
 // ── App state ──────────────────────────────────────────
@@ -1058,7 +1058,7 @@ function buildDashboard() {
     var row = document.createElement('div');
     row.className = 'flex justify-between py-1 px-1.5 rounded ' + (active ? 'bg-blue-50' : '');
     row.innerHTML = '<span class="' + (active ? 'text-blue-600 font-semibold' : 'text-slate-500') + '">' + MONTHS[mk].label + (active ? ' ◀' : '') + '</span>'
-      + '<span class="font-mono ' + (active ? 'text-blue-700 font-semibold' : 'text-slate-600') + '">$' + qv.toLocaleString() + '</span>';
+      + '<span class="font-mono ' + (active ? 'text-blue-700 font-semibold' : 'text-slate-600') + '">' + (qv > 0 ? '$' + qv.toLocaleString() : '—') + '</span>';
     ref.appendChild(row);
   });
 
