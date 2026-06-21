@@ -87,7 +87,7 @@
 
     <!-- Step 3 -->
     <div id="obS3" class="hidden">
-      <p class="text-sm text-slate-500 mb-4">Reference quotas — your real monthly targets are managed centrally (<span id="obSym2">$</span>)</p>
+      <p class="text-sm text-slate-500 mb-4">Your team's quarterly quota (<span id="obSym2">$</span>) — the app calculates your monthly quota automatically (÷ 3)</p>
       <div class="grid grid-cols-2 gap-3 mb-6">
         <div><label class="text-xs text-slate-500">Q1</label><input id="obQ1" type="number" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
         <div><label class="text-xs text-slate-500">Q2</label><input id="obQ2" type="number" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
@@ -207,7 +207,7 @@
               <input id="qOTE" type="number" oninput="scheduleSave()" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
             <div>
-              <label class="text-[10px] text-slate-400 uppercase tracking-wide">Team / Regional Quota (USD)</label>
+              <label class="text-[10px] text-slate-400 uppercase tracking-wide">Monthly Quota (USD)</label>
               <input id="seQuota" type="number" oninput="scheduleSave()" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
             <div>
@@ -581,10 +581,20 @@ function dashboardRegions() {
   return [profileRegionName(dashSelection())];
 }
 
+// SE's own monthly quota derived from their profile's quarterly quotas.
+function profileMonthlyQuota(m) {
+  var q = Math.ceil(parseInt(m.slice(5), 10) / 3);
+  var pq = profile.quotas && profile.quotas['Q' + q];
+  return pq ? Math.round(pq / 3) : 0;
+}
+
 // Quota for the current dashboard view (combined across regions for "ALL").
 function dashQuota(q) {
   if (dashIsAll()) {
     return REGION_KEYS.reduce(function(sum, rk) { return sum + regionQuota(rk, q); }, 0);
+  }
+  if (!currentUserIsAdmin()) {
+    return profileMonthlyQuota(q) || regionQuota(dashSelection(), q);
   }
   return regionQuota(dashSelection(), q);
 }
@@ -736,7 +746,7 @@ function adminRosterProfiles(liveProfiles) {
       displayName: se.name,
       email: 'Roster placeholder',
       region: se.region,
-      quarterlyOTE: se.quarterlyOTE || 0,
+      monthlyOTE: se.monthlyOTE || se.quarterlyOTE || 0,
       title: se.title,
       manager: se.manager,
       isRosterPlaceholder: true
@@ -751,7 +761,7 @@ function adminRosterProfiles(liveProfiles) {
 function adminProfileMetrics(p, q) {
   var regionKey = normRegion(p.region);
   var quota = regionQuota(regionKey, q);
-  var ote = p.quarterlyOTE || 0;
+  var ote = p.monthlyOTE || p.quarterlyOTE || 0;
   var rp = adminRegionPoolsCache[regionKey];
   var sePool = (rp && rp.aes) ? rp.aes.map(function(a) {
     return { name: a.name, cw: a.cwUSD || 0, type: a.type, aeRegion: a.aeRegion };
@@ -935,7 +945,7 @@ function obFinish() {
     currency: sym,
     fx: fx,
     annualOTE: annual,
-    quarterlyOTE: Math.round(annual / 4),
+    monthlyOTE: Math.round(annual / 12),
     quotas: { Q1: q1, Q2: q2, Q3: q3, Q4: q4 },
     onboarded: true,
     isAdmin: currentUserIsAdmin()
@@ -1011,7 +1021,7 @@ function scheduleSave() {
   document.getElementById('saveInd').textContent = 'Saving…';
   saveTimer = setTimeout(function() {
     profile.annualOTE    = parseFloat(document.getElementById('annOTE').value) || 0;
-    profile.quarterlyOTE = parseFloat(document.getElementById('qOTE').value) || 0;
+    profile.monthlyOTE = parseFloat(document.getElementById('qOTE').value) || 0;
     if (currentUser && currentUser.firebaseUid) {
       fsSetProfile(currentUser.firebaseUid, profile);
     } else {
@@ -1682,7 +1692,7 @@ function showRegionDetail(regionKey) {
     seTable.appendChild(seHead);
     var seBody = document.createElement('tbody');
     m.ses.forEach(function(se) {
-      var ote = se.quarterlyOTE || 0;
+      var ote = se.monthlyOTE || se.quarterlyOTE || 0;
       var pay = payout(poolUSD, quota, ote).pay;
       var tr = document.createElement('tr');
       tr.className = 'border-t border-slate-100';
