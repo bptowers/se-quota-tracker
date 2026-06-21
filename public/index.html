@@ -1903,45 +1903,44 @@ var SE_ROSTER = [
   { name:'TBH (open role)',  region:'ANZ',        title:'Sales Engineer',                         manager:'Brad Towers' }
 ];
 
-var SAMPLE_SES = [
-  { name:'Thilo Schatz',     manager:'Pete Mansel',  title:'VP, Global Sales Engineering',          location:'California, US',    region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:60000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:1.05,Q2:1.12,Q3:1.08,Q4:null}             },
-  { name:'Brad Towers',      manager:'Thilo Schatz', title:'Global Sr. Manager, Sales Engineering', location:'London, UK',         region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:40000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.78,Q2:0.92,Q3:1.05,Q4:null}, isMe:true  },
-  { name:'Austin Huddleson', manager:'Thilo Schatz', title:'Sales Engineer, Technology Integration',location:'California, US',    region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.88,Q2:0.95,Q3:1.02,Q4:null}             },
-  { name:'Carter Jones',     manager:'Thilo Schatz', title:'Senior Sales Engineer',                 location:'Colorado, US',       region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:45000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:1.12,Q2:1.08,Q3:0.97,Q4:null}             },
-  { name:'Conor Breen',      manager:'Thilo Schatz', title:'Senior Sales Engineer, Partnerships',   location:'Colorado, US',       region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:45000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.72,Q2:0.86,Q3:1.01,Q4:null}             },
-  { name:'Isabelle Schicht', manager:'Thilo Schatz', title:'Associate Sales Engineer',              location:'California, US',    region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:38000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.65,Q2:0.83,Q3:0.91,Q4:null}             },
-  { name:'Joseph Valdez',    manager:'Thilo Schatz', title:'Sales Engineer',                        location:'Colorado, US',       region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.55,Q2:0.71,Q3:0.88,Q4:null}             },
-  { name:'Sarah Sareh',      manager:'Thilo Schatz', title:'Senior Sales Engineer',                 location:'Texas, US',          region:'US',  currency:'$',   fx:1.0,   quarterlyOTE:45000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.98,Q2:1.15,Q3:1.22,Q4:null}             },
-  { name:'Adam Skinner',     manager:'Brad Towers',  title:'Sales Engineer',                        location:'Cambridgeshire, UK', region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.82,Q2:0.79,Q3:0.94,Q4:null}             },
-  { name:'Danielle Berson',  manager:'Brad Towers',  title:'Sales Engineer',                     location:'West Yorkshire, UK', region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:45000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.70,Q2:null,Q3:null,Q4:null} },
-  { name:'Dave Shaw',        manager:'Brad Towers',  title:'Sales Engineer',                        location:'Warwickshire, UK',   region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.91,Q2:1.03,Q3:0.98,Q4:null}             },
-  { name:'Dylan Rhodes',     manager:'Brad Towers',  title:'Sales Engineer',                        location:'Brisbane, AU',       region:'ANZ', currency:'A$',  fx:0.647, quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.68,Q2:0.76,Q3:0.85,Q4:null}             },
-  { name:'Jason Passey',     manager:'Brad Towers',  title:'Sales Engineer',                        location:'Cambridgeshire, UK', region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.95,Q2:0.88,Q3:1.07,Q4:null}             },
-  { name:'Lee Wilkinson',    manager:'Brad Towers',  title:'Principal Sales Engineer',              location:'Gwynedd, UK',        region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:48000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:1.08,Q2:1.20,Q3:1.15,Q4:null}             },
-  { name:'Matthew Beecham',  manager:'Brad Towers',  title:'Associate Sales Engineer',              location:'Leeds, UK',          region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:38000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.58,Q2:0.73,Q3:0.82,Q4:null}             },
-  { name:'Rodante Galamay',  manager:'Brad Towers',  title:'Sales Engineer',                        location:'Auckland, NZ',       region:'NZ',  currency:'NZ$', fx:0.60,  quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.77,Q2:0.89,Q3:0.96,Q4:null}             },
-  { name:'Roger Quinn',      manager:'Brad Towers',  title:'Sales Engineer',                        location:'West Yorkshire, UK', region:'UK',  currency:'£',   fx:1.34,  quarterlyOTE:42000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:0.84,Q2:0.92,Q3:1.04,Q4:null}             },
-  { name:'Shane Rhodes',     manager:'Brad Towers',  title:'Senior Sales Engineer',                 location:'Brisbane, AU',       region:'ANZ', currency:'A$',  fx:0.647, quarterlyOTE:45000, quotas:{Q1:175008,Q2:226150,Q3:288083,Q4:295123}, att:{Q1:1.01,Q2:1.05,Q3:0.99,Q4:null}             }
-];
-
-// ── Report tab: monthly sample data derived from the quarterly SAMPLE_SES ──
-// (Sample/Demo view.) Months elapsed this year, and the 3 most recent.
+// ── Report tab: real live data from Firestore regionPools ──
 var RPT_TODAY = new Date().toISOString().slice(0, 10);
 var ELAPSED_MONTHS = MONTH_KEYS.filter(function(m) { return MONTHS[m].start <= RPT_TODAY; });
 if (!ELAPSED_MONTHS.length) ELAPSED_MONTHS = [MONTH_KEYS[0]];
 var RPT_MONTHS = ELAPSED_MONTHS.slice(-3);
 
-function monthQuarter(m) { return 'Q' + Math.ceil(parseInt(m.slice(5), 10) / 3); }
-function monthPosInQuarter(m) { return (parseInt(m.slice(5), 10) - 1) % 3; }
-// Derive a plausible monthly attainment from the SE's quarterly sample value.
-function seMonthAtt(se, m) {
-  var a = se.att[monthQuarter(m)];
-  if (a === null || a === undefined) return null;
-  var f = [0.95, 1.0, 1.05][monthPosInQuarter(m)];
-  return Math.round(a * f * 100) / 100;
+// SE list for the report — all non-Global roster members.
+var RPT_SE_LIST = SE_ROSTER.filter(function(s){ return s.region !== 'Global'; });
+
+// Cache of loaded pool docs keyed by '{regionKey}_{YYYY-MM}'.
+var rptPoolData = {};
+
+function loadRptPools(cb) {
+  var keys = [];
+  REGION_KEYS.forEach(function(rk) {
+    RPT_MONTHS.forEach(function(m) { keys.push(rk + '_' + m); });
+  });
+  rptPoolData = {};
+  var pending = keys.length;
+  if (!pending) { if (cb) cb(); return; }
+  keys.forEach(function(key) {
+    db.collection('regionPools').doc(key).get()
+      .then(function(snap) { if (snap.exists) rptPoolData[key] = snap.data(); })
+      .catch(function(){})
+      .then(function() { if (--pending === 0 && cb) cb(); });
+  });
 }
-function seMonthQuota(se, m) { return Math.round(se.quotas[monthQuarter(m)] / 3); }
-function seMonthlyOTE(se) { return Math.round((se.quarterlyOTE || 0) / 3); }
+
+// Real attainment from regionPools — all SEs in a region share the same number.
+function seMonthAtt(se, m) {
+  if (!se.region || se.region === 'Global') return null;
+  var pool = rptPoolData[se.region + '_' + m];
+  if (!pool) return null;
+  var q = regionQuota(se.region, m);
+  return q ? Math.round((pool.totalCwUSD / q) * 100) / 100 : null;
+}
+function seMonthQuota(se, m) { return regionQuota(se.region, m); }
+function seMonthlyOTE(se) { return 0; }
 
 function seYTD(se) {
   var total = 0;
@@ -1984,28 +1983,6 @@ function buildReportTab() {
   document.getElementById('rptDate').textContent =
     today.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
 
-  // ── Team KPIs (across elapsed months)
-  var atQuota=0, totalComm=0, sumAtt=0, cntAtt=0;
-  SAMPLE_SES.forEach(function(se) {
-    totalComm += seYTD(se);
-    ELAPSED_MONTHS.forEach(function(m) {
-      var a = seMonthAtt(se, m);
-      if (a === null) return;
-      sumAtt += a; cntAtt++;
-      if (a >= 1) atQuota++;
-    });
-  });
-  var avgAtt = cntAtt ? sumAtt / cntAtt : 0;
-
-  var kpisEl = document.getElementById('rptKPIs');
-  while (kpisEl.firstChild) kpisEl.removeChild(kpisEl.firstChild);
-  app(kpisEl,
-    mkKpiNode('Team Size',             SAMPLE_SES.length + ' SEs',               'FY 2026 sample',       'text-slate-800'),
-    mkKpiNode('Avg Attainment (YTD)',  Math.round(avgAtt * 100) + '%',           'Months elapsed',       avgAtt >= 1 ? 'text-green-600' : avgAtt >= 0.8 ? 'text-blue-600' : 'text-slate-600'),
-    mkKpiNode('Months at Quota',       atQuota + ' of ' + cntAtt,                'SE-month slots',       'text-blue-600'),
-    mkKpiNode('Total Est. Commission', fmt(totalComm),                           'YTD',                  'text-slate-800')
-  );
-
   // ── Month column headers (last 3 months)
   RPT_MONTHS.forEach(function(m, i) {
     var th = document.getElementById('rptCol' + i);
@@ -2014,21 +1991,47 @@ function buildReportTab() {
   var ct = document.getElementById('rptChartTitle');
   if (ct) ct.textContent = 'Monthly Attainment by SE — last ' + RPT_MONTHS.length + ' months';
 
-  // ── Chart
-  buildReportChart();
-
   // ── Populate filter dropdown
   var sel = document.getElementById('rptFilterSel');
   while (sel.options.length > 1) sel.remove(1);
-  SAMPLE_SES.forEach(function(se) {
+  RPT_SE_LIST.forEach(function(se) {
     var opt = document.createElement('option');
     opt.value = se.name;
-    opt.textContent = se.name + (se.isMe ? ' (you)' : '');
+    opt.textContent = se.name;
     sel.appendChild(opt);
   });
 
-  // ── Initial render
-  rebuildRptList(SAMPLE_SES);
+  // ── Load real pool data then render
+  var kpisEl = document.getElementById('rptKPIs');
+  while (kpisEl.firstChild) kpisEl.removeChild(kpisEl.firstChild);
+  var spinner = cel('div', 'col-span-4 text-xs text-slate-400 py-2');
+  spinner.textContent = 'Loading…';
+  kpisEl.appendChild(spinner);
+
+  loadRptPools(function() {
+    // ── Team KPIs (across elapsed months)
+    var atQuota=0, sumAtt=0, cntAtt=0;
+    RPT_SE_LIST.forEach(function(se) {
+      ELAPSED_MONTHS.forEach(function(m) {
+        var a = seMonthAtt(se, m);
+        if (a === null) return;
+        sumAtt += a; cntAtt++;
+        if (a >= 1) atQuota++;
+      });
+    });
+    var avgAtt = cntAtt ? sumAtt / cntAtt : 0;
+
+    while (kpisEl.firstChild) kpisEl.removeChild(kpisEl.firstChild);
+    app(kpisEl,
+      mkKpiNode('Team Size',            RPT_SE_LIST.length + ' SEs',            'FY 2026 live',         'text-slate-800'),
+      mkKpiNode('Avg Attainment (YTD)', Math.round(avgAtt * 100) + '%',         'Months elapsed',       avgAtt >= 1 ? 'text-green-600' : avgAtt >= 0.8 ? 'text-blue-600' : 'text-slate-600'),
+      mkKpiNode('Months at Quota',      atQuota + ' of ' + cntAtt,              'SE-month slots',       'text-blue-600'),
+      mkKpiNode('Regions Live',         Object.keys(rptPoolData).length + ' pools', 'from BigQuery',    'text-slate-800')
+    );
+
+    buildReportChart();
+    rebuildRptList(RPT_SE_LIST);
+  });
 }
 
 function rebuildRptList(seList) {
@@ -2050,8 +2053,8 @@ function rebuildRptList(seList) {
 
     var regionCell = cel('td', 'px-3 py-2.5 text-center');
     app(regionCell,
-      ctxt('div', 'text-xs font-medium text-slate-600', se.location.split(', ').pop()),
-      ctxt('div', 'text-xs text-slate-400 mt-0.5', se.location.split(', ')[0]));
+      ctxt('div', 'text-xs font-medium text-slate-600', REGION_LABELS[se.region] || se.region),
+      ctxt('div', 'text-xs text-slate-400 mt-0.5', se.title));
     tr.appendChild(regionCell);
 
     RPT_MONTHS.forEach(function(m) {
@@ -2090,8 +2093,8 @@ var rptFilter = '';
 function onRptFilter() {
   rptFilter = document.getElementById('rptFilterSel').value;
   var seList = rptFilter
-    ? SAMPLE_SES.filter(function(se){ return se.name === rptFilter; })
-    : SAMPLE_SES;
+    ? RPT_SE_LIST.filter(function(se){ return se.name === rptFilter; })
+    : RPT_SE_LIST;
 
   // Update chart title
   var chartTitle = document.getElementById('rptChartTitle');
@@ -2109,7 +2112,7 @@ function onRptFilter() {
   var badge = document.getElementById('rptFilterBadge');
   if (badge) {
     if (rptFilter) {
-      badge.textContent = '1 of ' + SAMPLE_SES.length + ' SEs';
+      badge.textContent = '1 of ' + RPT_SE_LIST.length + ' SEs';
       badge.classList.remove('hidden');
     } else {
       badge.classList.add('hidden');
@@ -2139,11 +2142,11 @@ function buildSeCard(se, idx, ytd, st, avatarColors) {
   var infoEl = app(cel('div'),
     nameEl,
     ctxt('div', 'text-xs text-slate-600 font-medium mt-0.5', se.title),
-    ctxt('div', 'text-xs text-slate-400', se.location + ' · Reports to: ' + se.manager));
+    ctxt('div', 'text-xs text-slate-400', 'Reports to: ' + se.manager));
 
   var ytdBox = app(cel('div', 'text-right'),
     ctxt('div', 'text-xs text-slate-400', 'YTD Commission'),
-    ctxt('div', 'font-bold text-slate-800 text-sm', fmt(ytd)));
+    ctxt('div', 'font-bold text-slate-800 text-sm', ytd > 0 ? fmt(ytd) : '—'));
 
   app(header,
     app(cel('div', 'flex items-center gap-3'), avatar, infoEl),
@@ -2175,7 +2178,7 @@ function buildSeCard(se, idx, ytd, st, avatarColors) {
     barOuter.appendChild(barInner);
 
     var commEl = ctxt('div', 'text-xs text-slate-400',
-      isPending ? '—' : (qComm > 0 ? fmt(qComm) + ' earned' : 'No payout'));
+      isPending ? '—' : (seMonthlyOTE(se) === 0 ? '—' : (qComm > 0 ? fmt(qComm) + ' earned' : 'No payout')));
 
     app(strip, stripHdr, barOuter, commEl);
     grid.appendChild(strip);
@@ -2185,7 +2188,7 @@ function buildSeCard(se, idx, ytd, st, avatarColors) {
 }
 
 function buildReportChart(seList) {
-  seList = seList || SAMPLE_SES;
+  seList = seList || RPT_SE_LIST;
   var ctx = document.getElementById('rptChart').getContext('2d');
   if (rptChartInst) { rptChartInst.destroy(); rptChartInst = null; }
 
