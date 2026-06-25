@@ -27,24 +27,84 @@
 <body class="bg-slate-100 min-h-screen">
 
 <!-- ═══ LOGIN ═══ -->
-<div id="pgLogin" style="display:block" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-700">
-  <div class="bg-white rounded-2xl shadow-2xl p-10 w-full max-w-md text-center fade">
-    <div class="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto mb-5">SE</div>
-    <h1 class="text-2xl font-bold text-slate-800 mb-1">SE Quota Tracker</h1>
-    <p class="text-slate-500 text-sm mb-8">Simpro Group · Real-time commission dashboard</p>
-    <!-- Google SSO button -->
-    <button onclick="doGoogleSignIn()"
-      class="w-full flex items-center justify-center gap-3 border border-slate-200 rounded-xl px-5 py-3.5 text-slate-700 font-medium hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm mb-4">
-      <svg class="w-5 h-5" viewBox="0 0 24 24">
-        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-      </svg>
-      Sign in with Google
-    </button>
-    <p id="loginErr" class="text-red-500 text-xs mt-3 hidden"></p>
-    <p class="text-xs text-slate-400 mt-4">Access restricted to Simpro Group accounts</p>
+<div id="pgLogin" style="display:block" class="min-h-screen bg-slate-950 text-white overflow-hidden fade">
+  <div class="flex items-center justify-between min-h-screen px-12 py-16 gap-16 max-w-7xl mx-auto">
+
+    <!-- LEFT COLUMN: Content -->
+    <div class="flex-1">
+      <!-- Logo & Branding -->
+      <div class="flex items-center gap-3 mb-8">
+        <div class="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center text-white text-lg font-bold">SE</div>
+        <div>
+          <h1 class="text-lg font-bold">SE Attainment Tracker</h1>
+          <p class="text-xs text-slate-400">Simpro Group · Sales Engineering Leadership</p>
+        </div>
+      </div>
+
+      <!-- Headline with accent -->
+      <div class="mb-8">
+        <h2 class="text-4xl font-bold leading-tight mb-3">
+          Track the metrics that
+          <span class="text-yellow-400">drive SE impact.</span>
+        </h2>
+        <p class="text-slate-300 text-sm leading-relaxed">
+          One place for every deal, attainment, and commission metric that shows what your SE team is worth.
+        </p>
+      </div>
+
+      <!-- Feature Cards -->
+      <div class="space-y-4">
+        <!-- Track -->
+        <div class="flex gap-4 items-start p-4 bg-slate-900/40 border border-slate-700/40 rounded-lg hover:border-slate-600/60 transition-colors">
+          <div class="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center flex-shrink-0 text-lg">📊</div>
+          <div>
+            <h3 class="font-semibold text-white text-sm mb-1">Track</h3>
+            <p class="text-xs text-slate-400">Real-time attainment, monthly progress, and commission forecasting tied directly to deals.</p>
+          </div>
+        </div>
+
+        <!-- Model -->
+        <div class="flex gap-4 items-start p-4 bg-slate-900/40 border border-slate-700/40 rounded-lg hover:border-slate-600/60 transition-colors">
+          <div class="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center flex-shrink-0 text-lg">🎯</div>
+          <div>
+            <h3 class="font-semibold text-white text-sm mb-1">Model</h3>
+            <p class="text-xs text-slate-400">Scenario planning and quota projections — see what-if outcomes before they happen.</p>
+          </div>
+        </div>
+
+        <!-- Compare -->
+        <div class="flex gap-4 items-start p-4 bg-slate-900/40 border border-slate-700/40 rounded-lg hover:border-slate-600/60 transition-colors">
+          <div class="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center flex-shrink-0 text-lg">🗺️</div>
+          <div>
+            <h3 class="font-semibold text-white text-sm mb-1">Compare</h3>
+            <p class="text-xs text-slate-400">Regional performance breakdown and team benchmarking at a glance.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: Login Card -->
+    <div class="w-80 flex-shrink-0">
+      <div class="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-8 backdrop-blur-sm">
+        <h3 class="text-lg font-semibold mb-1 text-yellow-400">Welcome back</h3>
+        <p class="text-xs text-slate-400 mb-6">Sign in with your Simpro Google account</p>
+
+        <!-- Google SSO button -->
+        <button onclick="doGoogleSignIn()"
+          class="w-full flex items-center justify-center gap-3 bg-white text-slate-800 rounded-lg px-4 py-3 font-medium hover:bg-slate-50 transition-all shadow-lg mb-4">
+          <svg class="w-5 h-5" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          Sign in with Google
+        </button>
+
+        <p id="loginErr" class="text-red-400 text-xs mb-4 hidden text-center"></p>
+        <p class="text-xs text-slate-500 text-center">Access restricted to Simpro Group accounts</p>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -66,6 +126,7 @@
       <label class="block text-sm font-medium text-slate-700 mb-1">Region</label>
       <select id="obRegion" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-6 focus:outline-none focus:ring-2 focus:ring-blue-400">
         <option value="">— Select —</option>
+        <option value="Global">Global — All Regions</option>
         <option value="UK">UK (Simpro)</option>
         <option value="BigChange">BigChange</option>
         <option value="ANZ">ANZ</option>
@@ -215,6 +276,10 @@
               <input id="fxRate" type="number" step="0.001" oninput="scheduleSave()" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
           </div>
+          <button id="btnResetProfile" onclick="resetProfile()"
+            class="w-full mt-3 text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg py-1.5 hidden">
+            Reset Profile / Re-run Setup
+          </button>
         </div>
 
         <!-- Quarter quotas -->
@@ -251,6 +316,15 @@
           </div>
         </div>
 
+        <!-- Monthly Attainment Chart (Global IC view only) -->
+        <div id="monthlyAttCard" class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 hidden">
+          <div class="flex justify-between items-center mb-2">
+            <h2 class="font-semibold text-slate-800 text-sm">2026 Monthly Attainment</h2>
+            <span id="monthlyAttNote" class="text-xs text-slate-400"></span>
+          </div>
+          <div style="position:relative;height:220px"><canvas id="monthlyAttCanvas"></canvas></div>
+        </div>
+
         <!-- AE Revenue Pool -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
@@ -266,7 +340,6 @@
                   <th class="px-4 py-2 text-left text-xs font-medium text-slate-500">AE Name</th>
                   <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Type</th>
                   <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Closed Won $</th>
-                  <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Quota %</th>
                 </tr>
               </thead>
               <tbody id="aeBody"></tbody>
@@ -274,7 +347,6 @@
                 <tr>
                   <td colspan="2" class="px-4 py-2 text-xs font-semibold text-slate-600">Pool Total</td>
                   <td class="px-2 py-2 text-center text-xs font-mono font-bold text-slate-700" id="ftClosed">—</td>
-                  <td class="px-2 py-2 text-center text-xs font-mono font-bold" id="ftAtt">—</td>
                 </tr>
                 <tr>
                   <td colspan="4" class="px-4 py-1.5 text-xs" id="poolGap">—</td>
@@ -288,19 +360,63 @@
           </div>
         </div>
 
-        <!-- Pay Curve chart -->
-        <div id="payCurveCard" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-100">
-            <h2 class="font-semibold text-slate-800 text-sm">Pay Curve — Current AE Pool: <span id="payCurveLabel">$0</span></h2>
-            <p class="text-xs text-slate-400 mt-0.5">Commission payout vs. AE pool revenue · Linear from first dollar · Cap at 200% OTE</p>
+        <!-- Earned Commission This Month -->
+        <div id="earnedCommCard" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <h2 class="font-semibold text-slate-800 text-sm mb-3">Commission Earned This Month</h2>
+          <div class="space-y-2">
+            <div>
+              <div class="flex justify-between items-baseline mb-1">
+                <span class="text-xs text-slate-600">Earned so far</span>
+                <span class="font-mono font-bold text-green-700 text-sm" id="earnedAmount">$0</span>
+              </div>
+              <div class="h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div id="earnedBar" class="h-full bg-green-500 transition-all rounded-full" style="width:0%"></div>
+              </div>
+            </div>
+            <div class="bg-slate-50 rounded-lg px-3 py-2">
+              <div class="flex justify-between text-xs mb-0.5">
+                <span class="text-slate-500">If you maintain current pace</span>
+                <span class="font-mono text-slate-700" id="paceComm">$0</span>
+              </div>
+              <div class="text-[10px] text-slate-400">projected end-of-month</div>
+            </div>
+            <div class="bg-blue-50 rounded-lg px-3 py-2">
+              <div class="flex justify-between text-xs mb-0.5">
+                <span class="text-slate-600">If you hit 100% quota</span>
+                <span class="font-mono text-blue-700 font-semibold" id="quotaComm">$0</span>
+              </div>
+              <div class="text-[10px] text-slate-400">potential end-of-month</div>
+            </div>
           </div>
-          <div class="px-3 py-3" style="position:relative;height:420px"><canvas id="payCurveChart"></canvas></div>
+        </div>
+
+        <!-- Gap to Quota -->
+        <div id="gapToQuotaCard" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <h2 class="font-semibold text-slate-800 text-sm mb-3">Closed Won Gap to Milestones</h2>
+          <div id="gapRows" class="space-y-2 text-xs"></div>
         </div>
 
       </div>
 
       <!-- RIGHT SIDEBAR -->
       <div class="w-64 flex-shrink-0 space-y-4">
+
+        <!-- Quarterly Summary (Global IC view only) -->
+        <div id="quarterlyCard" class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 hidden">
+          <h2 class="font-semibold text-slate-800 text-sm mb-3">Quarterly Summary</h2>
+          <div id="quarterlyRows" class="space-y-2 text-xs"></div>
+          <div id="annualRow" class="mt-3 pt-3 border-t border-slate-100 text-xs"></div>
+        </div>
+
+        <!-- Scenario Modeler (Global IC view only) -->
+        <div id="scenarioCard" class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 hidden">
+          <h2 class="font-semibold text-slate-800 text-sm mb-2">Scenario Modeler</h2>
+          <p class="text-xs text-slate-400 mb-2">Adjust projected CW to see commission impact</p>
+          <label class="text-[10px] text-slate-400 uppercase tracking-wide">Projected CW this month ($)</label>
+          <input id="scenarioCW" type="number" oninput="onScenarioInput()"
+            class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          <div id="scenarioOutput" class="space-y-1.5"></div>
+        </div>
 
         <!-- Threshold Calculator -->
         <div id="threshCard" class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
@@ -523,6 +639,7 @@ var regionExpanded = {
   'Simpro North America': false, 'Simpro ANZ': false,
   'ClockShark North America': false
 };
+var icMonthlyDataCache = {};
 
 function profileRegionName(region) {
   var map = {
@@ -546,6 +663,7 @@ function defaultPoolForProfile() {
 // truth, stored per region in regionPools/{regionKey}_{quarter}.
 var REGION_KEYS   = ['UK', 'BigChange', 'US', 'ANZ', 'ClockShark'];
 var REGION_LABELS = { UK:'Simpro UK', BigChange:'BigChange', US:'Simpro US', ANZ:'Simpro ANZ', ClockShark:'ClockShark' };
+var GLOBAL_REGIONS = ['UK', 'BigChange', 'US', 'ANZ', 'ClockShark'];   // Brad's comp: all regions
 
 // NZ folds into ANZ (BigQuery combines AU + NZ as "SimPro ANZ").
 function normRegion(r) { return r === 'NZ' ? 'ANZ' : (r || 'UK'); }
@@ -575,9 +693,9 @@ function dashSelection() {
 }
 function dashIsAll() { return dashSelection() === 'ALL'; }
 
-// Region display names the AE pool groups by: all 5 for "ALL", else the one.
+// Region display names the AE pool groups by: all 5 for "ALL" or "Global", else the one.
 function dashboardRegions() {
-  if (dashIsAll()) return REGION_NAMES;
+  if (dashIsAll() || dashSelection() === 'Global') return REGION_NAMES;
   return [profileRegionName(dashSelection())];
 }
 
@@ -592,6 +710,11 @@ function profileMonthlyQuota(m) {
 function dashQuota(q) {
   if (dashIsAll()) {
     return REGION_KEYS.reduce(function(sum, rk) { return sum + regionQuota(rk, q); }, 0);
+  }
+  if (dashSelection() === 'Global') {
+    // Brad's own entered quota; fall back to sum of 4 admin-set regional quotas.
+    return profileMonthlyQuota(q) ||
+      GLOBAL_REGIONS.reduce(function(sum, rk) { return sum + regionQuota(rk, q); }, 0);
   }
   if (!currentUserIsAdmin()) {
     return profileMonthlyQuota(q) || regionQuota(dashSelection(), q);
@@ -610,8 +733,15 @@ function currentQuarterKey() {
 
 function regionQuota(regionKey, m) {
   var c = regionQuotaCfg[regionKey];
-  if (c && c.quotas && c.quotas[m] != null) return c.quotas[m];
-  return 0;
+  if (!c || !c.quotas) return 0;
+  // Month key (YYYY-MM): convert to quarterly quota ÷ 3
+  if (m && m.length === 7) {
+    var qNum = Math.ceil(parseInt(m.slice(5), 10) / 3);
+    var qQuota = c.quotas['Q' + qNum];
+    return qQuota ? Math.round(qQuota / 3) : 0;
+  }
+  // Quarter key (Q1–Q4): return quarterly total directly
+  return c.quotas[m] != null ? c.quotas[m] : 0;
 }
 
 // ── App state ──────────────────────────────────────────
@@ -756,6 +886,27 @@ function adminRosterProfiles(liveProfiles) {
   return profiles;
 }
 
+function seedRegionQuotasFromProfiles(profiles) {
+  var regionQuotas = {};
+  REGION_KEYS.forEach(function(rk) { regionQuotas[rk] = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }; });
+  (profiles || []).forEach(function(p) {
+    if (!p.region || isAdminEmail(p.email)) return;
+    var rk = normRegion(p.region);
+    if (rk && regionQuotas[rk]) {
+      ['Q1','Q2','Q3','Q4'].forEach(function(q) {
+        regionQuotas[rk][q] += (p.quotas && p.quotas[q]) || 0;
+      });
+    }
+  });
+  var promises = [];
+  REGION_KEYS.forEach(function(rk) {
+    if (regionQuotas[rk].Q1 || regionQuotas[rk].Q2 || regionQuotas[rk].Q3 || regionQuotas[rk].Q4) {
+      promises.push(fsSetRegionQuotas(rk, regionQuotas[rk]));
+    }
+  });
+  return Promise.all(promises);
+}
+
 // Every SE carries their region's number (USD). Pool + total come from the
 // region pool synced from BigQuery; quota from the editable region config.
 function adminProfileMetrics(p, q) {
@@ -893,7 +1044,7 @@ function obNext(step) {
       alert('Please fill in all fields.'); return;
     }
     var region = document.getElementById('obRegion').value;
-    var symMap = { UK:'£', BigChange:'£', ANZ:'A$', US:'$', ClockShark:'$' };
+    var symMap = { UK:'£', BigChange:'£', ANZ:'A$', US:'$', ClockShark:'$', Global:'$' };
     var sym = symMap[region] || '$';
     document.getElementById('obSym').textContent = sym;
     document.getElementById('obSym2').textContent = sym;
@@ -929,8 +1080,8 @@ function obBack() {
 function obFinish() {
   var region   = document.getElementById('obRegion').value;
   var annual   = parseFloat(document.getElementById('obOTE').value) || 0;
-  var fxMap    = { UK:1.34, BigChange:1.34, ANZ:0.647, US:1.0, ClockShark:1.0 };
-  var symMap   = { UK:'£', BigChange:'£', ANZ:'A$', US:'$', ClockShark:'$' };
+  var fxMap    = { UK:1.34, BigChange:1.34, ANZ:0.647, US:1.0, ClockShark:1.0, Global:1.0 };
+  var symMap   = { UK:'£', BigChange:'£', ANZ:'A$', US:'$', ClockShark:'$', Global:'$' };
   var fx = fxMap[region] || 1.0;
   var sym = symMap[region] || '$';
   var q1 = parseFloat(document.getElementById('obQ1').value) || 0;
@@ -1000,6 +1151,18 @@ function loadPool(callback) {
         });
         callback();
       });
+    } else if (dashSelection() === 'Global') {
+      // Brad's view: UK + BigChange + US + ANZ (no ClockShark).
+      fsGetRegionPoolsForQuarter(q, function(pools) {
+        regionPoolMeta = null;
+        pool = [];
+        GLOBAL_REGIONS.forEach(function(rk) {
+          var rp = pools[rk];
+          if (rp) pool = pool.concat(mapAes(rp, profileRegionName(rk)));
+          regionExpanded[profileRegionName(rk)] = true;
+        });
+        callback();
+      });
     } else {
       var regionKey = normRegion(dashSelection());
       fsGetRegionPool(regionKey, q, function(rp) {
@@ -1016,7 +1179,11 @@ function loadPool(callback) {
 // For admins, every dashboard view is a preview (incl. "view as SE"), so OTE
 // edits are display-only and never overwrite the stored profile.
 function scheduleSave() {
-  if (currentUserIsAdmin()) return;   // preview-only; nothing persisted
+  if (currentUserIsAdmin()) {
+    // Allow saves only when the admin has their own name selected in the IC picker.
+    var se = document.getElementById('icSE');
+    if (!se || se.value !== (profile && profile.displayName)) return;
+  }
   clearTimeout(saveTimer);
   document.getElementById('saveInd').textContent = 'Saving…';
   saveTimer = setTimeout(function() {
@@ -1029,6 +1196,17 @@ function scheduleSave() {
     }
     document.getElementById('saveInd').textContent = '';
   }, 800);
+}
+
+function resetProfile() {
+  if (!confirm('This will clear your region, OTE, and quotas so you can re-enter them. Continue?')) return;
+  profile.onboarded = false;
+  if (currentUser && currentUser.firebaseUid) {
+    fsSetProfile(currentUser.firebaseUid, profile).then(function() { showPage('pgOnboard'); });
+  } else {
+    setProfile(currentUser.uid, profile);
+    showPage('pgOnboard');
+  }
 }
 
 // ── DASHBOARD ──────────────────────────────────────────
@@ -1048,6 +1226,8 @@ function buildDashboard() {
   document.getElementById('fxRate').value  = fx;
   document.getElementById('seQuota').disabled = true;
   document.getElementById('fxRate').disabled  = true;
+  var btnRP = document.getElementById('btnResetProfile');
+  if (btnRP) btnRP.classList.toggle('hidden', !(isICView() && currentUserIsAdmin()));
 
   // Monthly quota reference (combined quota for "All", else the region's)
   var ref = document.getElementById('quotaRef');
@@ -1078,7 +1258,7 @@ function buildDashboard() {
   }
 
   // Per-SE commission tools only make sense for a single region — hide on "All".
-  ['compPlanCard','payCurveCard','threshCard'].forEach(function(id) {
+  ['compPlanCard','earnedCommCard','gapToQuotaCard','threshCard'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.classList.toggle('hidden', isAll);
   });
@@ -1101,6 +1281,302 @@ function buildDashboard() {
   buildAETable(sym);
   recalc();
   updateDays();
+
+  // IC analytics widgets (shown for all SE views, hidden on All-regions admin view)
+  var showIcCharts = !isAll;
+  ['monthlyAttCard','quarterlyCard','scenarioCard'].forEach(function(id) {
+    var el2 = document.getElementById(id);
+    if (el2) el2.classList.toggle('hidden', !showIcCharts);
+  });
+  if (showIcCharts) {
+    var attNote = document.getElementById('monthlyAttNote');
+    if (attNote) attNote.textContent = 'Loading…';
+    loadIcMonthlyData(function(gdata) {
+      buildMonthlyAttChart(gdata);
+      buildQuarterlySummary(gdata);
+      var scenIn = document.getElementById('scenarioCW');
+      var curM = document.getElementById('qSel').value;
+      if (scenIn && !scenIn.dataset.userEdited) scenIn.value = Math.round(gdata[curM] || 0);
+      buildScenarioOutput();
+      var n2 = document.getElementById('monthlyAttNote');
+      if (n2) n2.textContent = '';
+    });
+  }
+}
+
+// ── IC monthly data loader (all SE views) ─────────────────────────────────────
+function loadIcMonthlyData(callback) {
+  var sel = dashSelection();
+  if (icMonthlyDataCache[sel]) { callback(icMonthlyDataCache[sel]); return; }
+  var elapsed = ELAPSED_MONTHS;
+  if (!elapsed || !elapsed.length) { icMonthlyDataCache[sel] = {}; callback({}); return; }
+  var result = {};
+  var pending = elapsed.length;
+  elapsed.forEach(function(m) {
+    result[m] = 0;
+    fsGetRegionPoolsForQuarter(m, function(pools) {
+      if (sel === 'Global') {
+        GLOBAL_REGIONS.forEach(function(rk) {
+          if (pools[rk]) result[m] += pools[rk].totalCwUSD || 0;
+        });
+      } else {
+        if (pools[sel]) result[m] = pools[sel].totalCwUSD || 0;
+      }
+      if (--pending === 0) { icMonthlyDataCache[sel] = result; callback(icMonthlyDataCache[sel]); }
+    });
+  });
+}
+
+var monthlyAttChartInst = null;
+
+function buildMonthlyAttChart(data) {
+  var canvas = document.getElementById('monthlyAttCanvas');
+  if (!canvas) return;
+  if (monthlyAttChartInst) { monthlyAttChartInst.destroy(); monthlyAttChartInst = null; }
+  var ote = profile.monthlyOTE || Math.round((profile.annualOTE || 0) / 12);
+  var curM = document.getElementById('qSel').value;
+  var barColors = [], borderColors = [], barData = [], quotaData = [];
+  MONTH_KEYS.forEach(function(m) {
+    var cw = data[m] || 0;
+    var quota = profileMonthlyQuota(m);
+    var att = quota > 0 ? cw / quota : 0;
+    var isFuture = !data.hasOwnProperty(m);
+    barData.push(cw);
+    quotaData.push(quota);
+    if (isFuture) {
+      barColors.push('rgba(203,213,225,0.5)');
+      borderColors.push('rgba(203,213,225,0.8)');
+    } else if (att >= 1.0) {
+      barColors.push('rgba(34,197,94,0.7)');
+      borderColors.push(m === curM ? 'rgb(22,163,74)' : 'rgba(34,197,94,0.9)');
+    } else if (att >= 0.8) {
+      barColors.push('rgba(251,146,60,0.7)');
+      borderColors.push(m === curM ? 'rgb(234,88,12)' : 'rgba(251,146,60,0.9)');
+    } else {
+      barColors.push('rgba(59,130,246,0.6)');
+      borderColors.push(m === curM ? 'rgb(37,99,235)' : 'rgba(59,130,246,0.85)');
+    }
+  });
+  var labels = MONTH_KEYS.map(function(m) { return MONTHS[m].label.slice(0, 3); });
+  monthlyAttChartInst = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'CW (USD)',
+          data: barData,
+          backgroundColor: barColors,
+          borderColor: borderColors,
+          borderWidth: 2,
+          borderRadius: 4,
+          order: 2
+        },
+        {
+          label: 'Monthly Quota',
+          data: quotaData,
+          type: 'line',
+          borderColor: 'rgba(100,116,139,0.7)',
+          borderWidth: 1.5,
+          borderDash: [5, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              if (ctx.datasetIndex === 1) return 'Quota: $' + Math.round(ctx.parsed.y).toLocaleString();
+              var m = MONTH_KEYS[ctx.dataIndex];
+              var quota = profileMonthlyQuota(m);
+              var cw = ctx.parsed.y;
+              var att = quota > 0 ? (cw / quota * 100).toFixed(1) : '—';
+              var oteV = profile.monthlyOTE || Math.round((profile.annualOTE || 0) / 12);
+              var comm = quota > 0 ? payout(cw, quota, oteV).pay : 0;
+              return [
+                'CW: $' + Math.round(cw).toLocaleString(),
+                'Attainment: ' + att + '%',
+                'Commission: $' + Math.round(comm).toLocaleString()
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: {
+          ticks: {
+            font: { size: 10 },
+            callback: function(v) { return '$' + (v >= 1000 ? Math.round(v / 1000) + 'k' : v); }
+          },
+          grid: { color: 'rgba(226,232,240,0.8)' }
+        }
+      }
+    }
+  });
+}
+
+function buildQuarterlySummary(data) {
+  var rowsEl = document.getElementById('quarterlyRows');
+  var annualEl = document.getElementById('annualRow');
+  if (!rowsEl || !annualEl) return;
+  while (rowsEl.firstChild) rowsEl.removeChild(rowsEl.firstChild);
+  while (annualEl.firstChild) annualEl.removeChild(annualEl.firstChild);
+  var ote = profile.monthlyOTE || Math.round((profile.annualOTE || 0) / 12);
+  var curM = document.getElementById('qSel').value;
+  var curQ = Math.ceil(parseInt(curM.slice(5), 10) / 3);
+  var ytdCW = 0, ytdQuota = 0, ytdComm = 0;
+  var elapsedCount = Object.keys(data).length;
+  for (var qNum = 1; qNum <= 4; qNum++) {
+    var qMonths = MONTH_KEYS.filter(function(m) { return Math.ceil(parseInt(m.slice(5), 10) / 3) === qNum; });
+    var qQuota = (profile.quotas && profile.quotas['Q' + qNum]) || 0;
+    var qCW = 0, qComm = 0;
+    var hasElapsed = false;
+    qMonths.forEach(function(m) {
+      if (data.hasOwnProperty(m)) {
+        hasElapsed = true;
+        var mCW = data[m] || 0;
+        qCW += mCW;
+        qComm += payout(mCW, profileMonthlyQuota(m), ote).pay;
+      }
+    });
+    if (hasElapsed) { ytdCW += qCW; ytdQuota += qQuota; ytdComm += qComm; }
+    var isCurrentQ = qNum === curQ;
+    var row = document.createElement('div');
+    row.className = 'rounded-lg px-2 py-1.5' + (isCurrentQ ? ' bg-blue-50' : '');
+    var rowTop = document.createElement('div');
+    rowTop.className = 'flex justify-between items-center mb-0.5';
+    var qlabel = document.createElement('span');
+    qlabel.className = 'font-semibold ' + (isCurrentQ ? 'text-blue-700' : 'text-slate-600');
+    qlabel.textContent = 'Q' + qNum;
+    rowTop.appendChild(qlabel);
+    if (!hasElapsed) {
+      var pend = document.createElement('span');
+      pend.className = 'text-slate-400 text-[10px]';
+      pend.textContent = 'Pending';
+      rowTop.appendChild(pend);
+    } else {
+      var attPct = qQuota > 0 ? (qCW / qQuota * 100).toFixed(0) : '—';
+      var attNum = qQuota > 0 ? qCW / qQuota : 0;
+      var badge = document.createElement('span');
+      badge.className = 'text-[10px] font-semibold px-1.5 py-0.5 rounded ' +
+        (attNum >= 1.0 ? 'bg-green-100 text-green-700' :
+         attNum >= 0.8 ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700');
+      badge.textContent = attPct + '%';
+      rowTop.appendChild(badge);
+    }
+    row.appendChild(rowTop);
+    if (hasElapsed) {
+      var detail = document.createElement('div');
+      detail.className = 'flex justify-between text-slate-500 mt-0.5';
+      var cwSpan = document.createElement('span');
+      cwSpan.textContent = 'CW $' + Math.round(qCW).toLocaleString();
+      var commSpan = document.createElement('span');
+      commSpan.className = 'font-mono font-semibold ' + (isCurrentQ ? 'text-blue-700' : 'text-slate-700');
+      commSpan.textContent = '$' + Math.round(qComm).toLocaleString();
+      detail.appendChild(cwSpan);
+      detail.appendChild(commSpan);
+      row.appendChild(detail);
+    }
+    rowsEl.appendChild(row);
+  }
+  var annualQuota = ['Q1','Q2','Q3','Q4'].reduce(function(s, k) {
+    return s + ((profile.quotas && profile.quotas[k]) || 0);
+  }, 0);
+  var ytdAtt = ytdQuota > 0 ? (ytdCW / ytdQuota * 100).toFixed(0) : '—';
+  var runRate = elapsedCount > 0 ? Math.round(ytdComm / elapsedCount * 12) : 0;
+  var aTop = document.createElement('div');
+  aTop.className = 'flex justify-between items-center mb-0.5';
+  var aLabel = document.createElement('span');
+  aLabel.className = 'font-semibold text-slate-700';
+  aLabel.textContent = 'Annual (YTD)';
+  var aAtt = document.createElement('span');
+  aAtt.className = 'text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600';
+  aAtt.textContent = ytdAtt + '%';
+  aTop.appendChild(aLabel);
+  aTop.appendChild(aAtt);
+  annualEl.appendChild(aTop);
+  var aDetail = document.createElement('div');
+  aDetail.className = 'flex justify-between text-slate-500';
+  var aCW = document.createElement('span');
+  aCW.textContent = 'YTD $' + Math.round(ytdCW).toLocaleString();
+  var aComm = document.createElement('span');
+  aComm.className = 'font-mono font-semibold text-slate-700';
+  aComm.textContent = '$' + Math.round(ytdComm).toLocaleString() + ' earned';
+  aDetail.appendChild(aCW);
+  aDetail.appendChild(aComm);
+  annualEl.appendChild(aDetail);
+  var aRun = document.createElement('div');
+  aRun.className = 'text-slate-400 mt-0.5';
+  aRun.textContent = 'Run-rate: $' + runRate.toLocaleString() + '/yr';
+  annualEl.appendChild(aRun);
+}
+
+function onScenarioInput() {
+  var inp = document.getElementById('scenarioCW');
+  if (inp) inp.dataset.userEdited = '1';
+  buildScenarioOutput();
+}
+
+function buildScenarioOutput() {
+  var outEl = document.getElementById('scenarioOutput');
+  if (!outEl) return;
+  while (outEl.firstChild) outEl.removeChild(outEl.firstChild);
+  var inp = document.getElementById('scenarioCW');
+  var scenCW = parseFloat((inp && inp.value) || 0) || 0;
+  var curM = document.getElementById('qSel').value;
+  var ote = profile.monthlyOTE || Math.round((profile.annualOTE || 0) / 12);
+  var mQuota = profileMonthlyQuota(curM);
+  var curQ = Math.ceil(parseInt(curM.slice(5), 10) / 3);
+  var mRes = payout(scenCW, mQuota, ote);
+  var qMonths2 = MONTH_KEYS.filter(function(m) { return Math.ceil(parseInt(m.slice(5), 10) / 3) === curQ; });
+  var qComm2 = 0;
+  qMonths2.forEach(function(m) {
+    var cachedData = icMonthlyDataCache[dashSelection()];
+    var mCW = (m === curM) ? scenCW : ((cachedData && cachedData[m]) || 0);
+    qComm2 += payout(mCW, profileMonthlyQuota(m), ote).pay;
+  });
+  var yearComm = 0;
+  if (mQuota > 0) {
+    MONTH_KEYS.forEach(function(m) {
+      var projCW = (scenCW / mQuota) * profileMonthlyQuota(m);
+      yearComm += payout(projCW, profileMonthlyQuota(m), ote).pay;
+    });
+  }
+  function makeRow(label, value, sub) {
+    var row = document.createElement('div');
+    row.className = 'bg-slate-50 rounded-lg px-3 py-2';
+    var rowTop = document.createElement('div');
+    rowTop.className = 'flex justify-between items-baseline';
+    var lbl = document.createElement('span');
+    lbl.className = 'text-[10px] text-slate-500 uppercase tracking-wide';
+    lbl.textContent = label;
+    var val = document.createElement('span');
+    val.className = 'font-mono font-bold text-blue-700 text-sm';
+    val.textContent = '$' + Math.round(value).toLocaleString();
+    rowTop.appendChild(lbl);
+    rowTop.appendChild(val);
+    row.appendChild(rowTop);
+    if (sub) {
+      var subEl = document.createElement('div');
+      subEl.className = 'text-[10px] text-slate-400 mt-0.5';
+      subEl.textContent = sub;
+      row.appendChild(subEl);
+    }
+    return row;
+  }
+  var attPctStr = mQuota > 0 ? (scenCW / mQuota * 100).toFixed(0) + '% attainment' : '';
+  outEl.appendChild(makeRow('This month', mRes.pay, attPctStr));
+  outEl.appendChild(makeRow('This quarter (Q' + curQ + ')', qComm2, 'months in Q' + curQ + ' combined'));
+  outEl.appendChild(makeRow('Annual run-rate', yearComm, 'if every month = this attainment'));
 }
 
 function toggleRegion(r) {
@@ -1197,16 +1673,6 @@ function buildAETable(sym) {
       cwCell.textContent = sym + Math.round(ae.cw || 0).toLocaleString();
       tr.appendChild(cwCell);
 
-      // Quota %
-      var attCell = document.createElement('td');
-      attCell.className = 'px-2 py-1.5 text-center';
-      var attSpan = document.createElement('span');
-      attSpan.id = 'att_' + poolIdx;
-      attSpan.className = 'text-xs font-mono font-semibold text-slate-300';
-      attSpan.textContent = '—';
-      attCell.appendChild(attSpan);
-      tr.appendChild(attCell);
-
       tbody.appendChild(tr);
     });
   });
@@ -1242,6 +1708,7 @@ function doManualSync() {
   if (btn) { btn.disabled = true; btn.textContent = 'Syncing\u2026'; }
   firebase.functions().httpsCallable('bqManualSync')({}).then(function(result) {
     if (btn) { btn.disabled = false; btn.textContent = 'Sync Now'; }
+    icMonthlyDataCache = {};
     loadSyncStatus();
     buildSyncPanel();
     var t = document.getElementById('toast');
@@ -1372,17 +1839,6 @@ function recalc() {
   var totClosed = 0;
   pool.forEach(function(ae, i) {
     totClosed += ae.cw || 0;
-    var el = document.getElementById('att_' + i);
-    if (el) {
-      if (quota > 0) {
-        var a = (ae.cw * fx) / quota;
-        el.textContent = Math.round(a * 100) + '%';
-        el.className = 'text-xs font-mono font-semibold ' + attColor(a);
-      } else {
-        el.textContent = '—';
-        el.className = 'text-xs font-mono text-slate-400';
-      }
-    }
   });
 
   // Keep region header totals in sync
@@ -1442,10 +1898,6 @@ function recalc() {
   document.getElementById('ftClosed').textContent = sym + Math.round(totClosed).toLocaleString();
   document.getElementById('poolUSD').textContent = fmt(poolUSD);
   document.getElementById('fxDisp').textContent = '$' + fx.toFixed(3);
-  var pAtt = quota > 0 ? Math.round(poolUSD / quota * 100) : 0;
-  var ftAtt = document.getElementById('ftAtt');
-  ftAtt.textContent = pAtt + '%';
-  ftAtt.className = 'px-2 py-2 text-center font-bold text-sm ' + attColor(att);
   var gapToQuotaNative = Math.max(0, Math.ceil(quota / fx - totClosed));
   document.getElementById('poolGap').innerHTML = att >= 1
     ? '<span class="text-green-600 font-semibold">✓ Quota hit</span> — earning ' + fmt(pay)
@@ -1458,7 +1910,12 @@ function recalc() {
   // Per-SE commission tools only render for a single region (hidden on "All").
   if (!dashIsAll()) {
     buildThresh(quota, ote, poolUSD, fx, sym);
-    buildPayCurveChart(quota, ote, poolUSD);
+    var today = new Date();
+    var start = new Date(qd.start);
+    var daysInMonth = qd.days;
+    var daysElapsed = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
+    buildEarnedCommCard(poolUSD, quota, ote, daysElapsed, daysInMonth);
+    buildGapToQuotaCard(poolUSD, quota, ote);
   }
 }
 
@@ -1519,14 +1976,18 @@ function onDashRegionChange() {
   });
 }
 
-// Fill the IC "view as SE" picker once, with real regional SEs (not the global lead).
+// Fill the IC "view as SE" picker — Global lead first, then regional SEs.
 function populateIcPicker() {
   var sel = document.getElementById('icSE');
   if (!sel || sel.options.length || typeof SE_ROSTER === 'undefined') return;
-  SE_ROSTER.filter(function(s) { return s.region !== 'Global'; }).forEach(function(s) {
+  var sorted = SE_ROSTER.slice().sort(function(a, b) { return a.region === 'Global' ? -1 : 1; });
+  sorted.forEach(function(s) {
+    var label = s.region === 'Global'
+      ? 'Global (All Regions)'
+      : (REGION_LABELS[s.region] || s.region);
     var o = document.createElement('option');
     o.value = s.name;
-    o.textContent = s.name + ' — ' + (REGION_LABELS[s.region] || s.region);
+    o.textContent = s.name + ' — ' + label;
     sel.appendChild(o);
   });
 }
@@ -1534,7 +1995,16 @@ function populateIcPicker() {
 function onViewAsChange() {
   viewAs = document.getElementById('viewAs').value;
   populateIcPicker();
-  if (viewAs === 'ic') showTab('se');   // IC has no Team View / Report
+  if (viewAs === 'ic') {
+    // Default the picker to the admin's own name so they see their own IC view first.
+    var picker = document.getElementById('icSE');
+    if (picker && profile && profile.displayName) {
+      var opts = Array.prototype.slice.call(picker.options);
+      var own = opts.filter(function(o) { return o.value === profile.displayName; })[0];
+      if (own) picker.value = profile.displayName;
+    }
+    showTab('se');
+  }
   loadPool(function() { buildDashboard(); });
 }
 
@@ -1595,6 +2065,9 @@ function buildAdminView() {
       adminRegionPoolsCache = regionPools || {};
       fsGetAllProfiles(function(profiles) {
         adminProfilesCache = adminRosterProfiles(profiles);
+        if (Object.keys(regionQuotaCfg).length === 0) {
+          seedRegionQuotasFromProfiles(profiles);
+        }
         while (grid.firstChild) grid.removeChild(grid.firstChild);
 
         REGION_KEYS.forEach(function(regionKey) {
@@ -1758,130 +2231,73 @@ function adminKpiNode(label, value, sub, valueClass) {
 }
 
 
-// ── PAY CURVE CHART ────────────────────────────────────
-var payCurveChartInst = null;
+// ── EARNED COMMISSION & GAP TO QUOTA CARDS ────────────
+function buildEarnedCommCard(currentCW, currentQuota, ote, daysElapsed, daysInMonth) {
+  var earnEl = document.getElementById('earnedAmount');
+  var barEl = document.getElementById('earnedBar');
+  var paceEl = document.getElementById('paceComm');
+  var quotaEl = document.getElementById('quotaComm');
+  if (!earnEl) return;
 
-function buildPayCurveChart(quota, ote, currentPoolUSD) {
-  var el = document.getElementById('payCurveChart');
-  if (!el) return;
-  if (payCurveChartInst) { payCurveChartInst.destroy(); payCurveChartInst = null; }
+  var earnedRes = payout(currentCW, currentQuota, ote);
+  var earnedComm = earnedRes.pay;
+  var projectedCW = daysInMonth > 0 && daysElapsed > 0 ? currentCW * (daysInMonth / daysElapsed) : currentCW;
+  var projectedRes = payout(projectedCW, currentQuota, ote);
+  var projectedComm = projectedRes.pay;
+  var quotaPotential = ote; // 100% of quota = 100% of OTE
 
-  var lbl = document.getElementById('payCurveLabel');
-  if (lbl) lbl.textContent = fmt(currentPoolUSD);
+  earnEl.textContent = fmt(earnedComm);
+  barEl.style.width = Math.min(100, (earnedComm / ote * 100)) + '%';
+  paceEl.textContent = fmt(projectedComm);
+  quotaEl.textContent = fmt(quotaPotential);
+}
 
-  if (!quota || !ote) return;
+function buildGapToQuotaCard(currentCW, currentQuota, ote) {
+  var rowsEl = document.getElementById('gapRows');
+  if (!rowsEl) return;
+  while (rowsEl.firstChild) rowsEl.removeChild(rowsEl.firstChild);
 
-  var maxUSD = Math.max(quota * 2.1, currentPoolUSD * 1.08, 1000);
-  var maxPay = ote * 2.05;
-  var quotaUSD = quota;
-  var capUSD = quota * 2;
-  var numPoints = 220;
-  var earnedData = [];
-  for (var i = 0; i <= numPoints; i++) {
-    var x = maxUSD * i / numPoints;
-    earnedData.push({ x: x, y: payout(x, quota, ote).pay });
-  }
-  var curPay = payout(currentPoolUSD, quota, ote).pay;
-  var ctx = el.getContext('2d');
-  var gradient = ctx.createLinearGradient(0, 0, 0, 360);
-  gradient.addColorStop(0, 'rgba(16,185,129,0.26)');
-  gradient.addColorStop(0.58, 'rgba(59,130,246,0.12)');
-  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  var milestones = [
+    { pct: 50, label: '50% Quota' },
+    { pct: 80, label: '80% Quota' },
+    { pct: 100, label: '100% Quota' },
+    { pct: 150, label: '150% Quota' },
+    { pct: 200, label: '200% Cap' }
+  ];
 
-  function marker(label, x, color, dash) {
-    return {
-      label: label,
-      data: [{ x: x, y: 0 }, { x: x, y: maxPay }],
-      borderColor: color,
-      borderWidth: 1.5,
-      borderDash: dash,
-      pointRadius: 0,
-      fill: false,
-      tension: 0,
-      order: 0
-    };
-  }
+  milestones.forEach(function(m) {
+    var targetCW = (m.pct / 100) * currentQuota;
+    var gap = Math.max(0, targetCW - currentCW);
+    var commAtMilestone = payout(targetCW, currentQuota, ote).pay;
+    var exceeded = gap === 0 && targetCW > currentCW ? false : (targetCW <= currentCW);
 
-  payCurveChartInst = new Chart(ctx, {
-    type: 'line',
-    data: {
-      datasets: [
-        {
-          label: 'Commission payout',
-          data: earnedData,
-          borderColor: 'rgb(37,99,235)',
-          backgroundColor: gradient,
-          fill: true,
-          tension: 0.22,
-          pointRadius: 0,
-          borderWidth: 3,
-          order: 2
-        },
-        marker('100% quota', quotaUSD, 'rgba(34,197,94,0.85)', [6, 4]),
-        marker('200% cap', capUSD, 'rgba(168,85,247,0.8)', [6, 4]),
-        {
-          label: 'Current AE pool',
-          data: [{ x: currentPoolUSD, y: curPay }],
-          borderColor: 'rgb(15,23,42)',
-          backgroundColor: 'rgb(15,23,42)',
-          pointBorderColor: 'white',
-          pointBorderWidth: 2,
-          pointRadius: 7,
-          pointHoverRadius: 9,
-          showLine: false,
-          order: 1
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'nearest', intersect: false },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            font: { size: 11 },
-            usePointStyle: true,
-            padding: 14
-          }
-        },
-        tooltip: {
-          filter: function(item) {
-            return item.dataset.label !== '100% quota'
-              && item.dataset.label !== '200% cap';
-          },
-          callbacks: {
-            title: function(items) {
-              return items[0] ? 'Pool: ' + fmt(items[0].parsed.x) : '';
-            },
-            label: function(c) {
-              var att = c.parsed.x / quota;
-              return c.dataset.label + ': ' + fmt(c.parsed.y) + ' at ' + Math.round(att * 100) + '% attainment';
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          type: 'linear',
-          min: 0,
-          max: maxUSD,
-          ticks: {
-            font: { size: 10 },
-            maxTicksLimit: 9,
-            callback: function(v) { return '$' + Math.round(v / 1000) + 'k'; }
-          },
-          grid: { color: 'rgba(15,23,42,0.05)' }
-        },
-        y: {
-          suggestedMax: maxPay,
-          ticks: { callback: function(v) { return '$' + Math.round(v / 1000) + 'k'; }, font: { size: 10 } },
-          grid: { color: 'rgba(15,23,42,0.06)' },
-          beginAtZero: true
-        }
-      }
+    var row = document.createElement('div');
+    row.className = 'rounded-lg px-3 py-2 ' + (exceeded && targetCW <= currentCW ? 'bg-green-50' : 'bg-slate-50');
+
+    var top = document.createElement('div');
+    top.className = 'flex justify-between items-baseline mb-0.5';
+
+    var label = document.createElement('span');
+    label.className = 'font-medium ' + (exceeded && targetCW <= currentCW ? 'text-green-700' : 'text-slate-600');
+    label.textContent = m.label;
+    top.appendChild(label);
+
+    var gapSpan = document.createElement('span');
+    gapSpan.className = 'font-mono text-slate-700';
+    if (exceeded && targetCW <= currentCW) {
+      gapSpan.textContent = '✓ Hit';
+    } else {
+      gapSpan.textContent = 'Need $' + Math.round(gap).toLocaleString();
     }
+    top.appendChild(gapSpan);
+    row.appendChild(top);
+
+    var comm = document.createElement('div');
+    comm.className = 'text-[10px] text-slate-400';
+    comm.textContent = 'Commission at this point: ' + fmt(commAtMilestone);
+    row.appendChild(comm);
+
+    rowsEl.appendChild(row);
   });
 }
 
