@@ -727,6 +727,11 @@ function profileMonthlyQuota(m) {
 
 // Quota for the current dashboard view (combined across regions for "ALL").
 function dashQuota(q) {
+  // Global-region users (Brad) always use personal profile quota for their comp calculations
+  if (profile && profile.region === 'Global') {
+    return profileMonthlyQuota(q) ||
+      GLOBAL_REGIONS.reduce(function(sum, rk) { return sum + regionQuota(rk, q); }, 0);
+  }
   if (dashIsAll()) {
     return REGION_KEYS.reduce(function(sum, rk) { return sum + regionQuota(rk, q); }, 0);
   }
@@ -1259,11 +1264,11 @@ function buildDashboard() {
   var btnRP = document.getElementById('btnResetProfile');
   if (btnRP) btnRP.classList.toggle('hidden', !(isICView() && currentUserIsAdmin()));
 
-  // Monthly quota reference (combined quota for "All", else the region's)
+  // Monthly quota reference (personal profile quota for users with Global region)
   var ref = document.getElementById('quotaRef');
   ref.innerHTML = '';
   MONTH_KEYS.forEach(function(mk) {
-    var qv = dashQuota(mk);
+    var qv = profileMonthlyQuota(mk) || dashQuota(mk);
     var active = mk === q;
     var row = document.createElement('div');
     row.className = 'flex justify-between py-1 px-1.5 rounded ' + (active ? 'bg-blue-50' : '');
