@@ -264,8 +264,9 @@
               <input id="annOTE" type="number" oninput="onOTEChange()" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
             <div>
-              <label class="text-[10px] text-slate-400 uppercase tracking-wide">Monthly OTE</label>
+              <label class="text-[10px] text-slate-400 uppercase tracking-wide">Monthly Comm OTE (30%)</label>
               <input id="qOTE" type="number" oninput="scheduleSave()" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <p class="text-[9px] text-slate-500 mt-1">30% of Annual OTE</p>
             </div>
             <div>
               <label class="text-[10px] text-slate-400 uppercase tracking-wide">Monthly Quota (USD)</label>
@@ -609,6 +610,13 @@ function hydrateProfile(p) {
   p = p || {};
   p.isAdmin = currentUserIsAdmin();
   return p;
+}
+
+// Compensation structure: 70/30 plan (70% base, 30% commission-eligible)
+var COMMISSION_PCT = 0.30;
+
+function commMonthlyOTE() {
+  return Math.round((profile.annualOTE || 0) * COMMISSION_PCT / 12);
 }
 
 // Monthly period model (MRR-based comp).
@@ -1105,7 +1113,7 @@ function obFinish() {
     currency: sym,
     fx: fx,
     annualOTE: annual,
-    monthlyOTE: Math.round(annual / 12),
+    monthlyOTE: Math.round(annual * COMMISSION_PCT / 12),
     quotas: { Q1: q1, Q2: q2, Q3: q3, Q4: q4 },
     onboarded: true,
     isAdmin: currentUserIsAdmin()
@@ -1226,7 +1234,7 @@ function buildDashboard() {
   var fx   = 1.0;
   var isAll = dashIsAll();
   var quota = dashQuota(q);
-  var ote  = Math.round((profile.annualOTE || 0) / 12);   // monthly OTE
+  var ote  = commMonthlyOTE();   // monthly commission OTE (30% of annual)
 
   // Settings panel — OTE editable; quota & FX are region-derived (read-only).
   document.getElementById('annOTE').value  = profile.annualOTE || 0;
@@ -1431,7 +1439,7 @@ function buildMonthlyAttChart(data) {
               var quota = profileMonthlyQuota(m);
               var cw = ctx.parsed.y;
               var att = quota > 0 ? (cw / quota * 100).toFixed(1) : '—';
-              var oteV = profile.monthlyOTE || Math.round((profile.annualOTE || 0) / 12);
+              var oteV = commMonthlyOTE();
               var comm = quota > 0 ? payout(cw, quota, oteV).pay : 0;
               return [
                 'CW: $' + Math.round(cw).toLocaleString(),
@@ -1464,7 +1472,7 @@ function buildMonthlyCommChart(data) {
   var canvas = document.getElementById('monthlyCommCanvas');
   if (!canvas) return;
   if (monthlyCommChartInst) { monthlyCommChartInst.destroy(); monthlyCommChartInst = null; }
-  var ote = profile.monthlyOTE || Math.round((profile.annualOTE || 0) / 12);
+  var ote = commMonthlyOTE();
   var curM = document.getElementById('qSel').value;
   var barColors = [], borderColors = [], commData = [], oteLineData = [];
   MONTH_KEYS.forEach(function(m) {
@@ -1559,7 +1567,7 @@ function buildQuarterlySummary(data) {
   if (!rowsEl || !annualEl) return;
   while (rowsEl.firstChild) rowsEl.removeChild(rowsEl.firstChild);
   while (annualEl.firstChild) annualEl.removeChild(annualEl.firstChild);
-  var ote = profile.monthlyOTE || Math.round((profile.annualOTE || 0) / 12);
+  var ote = commMonthlyOTE();
   var curM = document.getElementById('qSel').value;
   var curQ = Math.ceil(parseInt(curM.slice(5), 10) / 3);
   var ytdCW = 0, ytdQuota = 0, ytdComm = 0;
@@ -1662,7 +1670,7 @@ function buildScenarioOutput() {
   var inp = document.getElementById('scenarioCW');
   var scenCW = parseFloat((inp && inp.value) || 0) || 0;
   var curM = document.getElementById('qSel').value;
-  var ote = profile.monthlyOTE || Math.round((profile.annualOTE || 0) / 12);
+  var ote = commMonthlyOTE();
   var mQuota = profileMonthlyQuota(curM);
   var curQ = Math.ceil(parseInt(curM.slice(5), 10) / 3);
   var mRes = payout(scenCW, mQuota, ote);
@@ -2088,7 +2096,7 @@ function updateDays() {
 // ── EVENT HANDLERS ─────────────────────────────────────
 function onOTEChange() {
   var ann = parseFloat(document.getElementById('annOTE').value) || 0;
-  document.getElementById('qOTE').value = Math.round(ann / 12);   // monthly OTE
+  document.getElementById('qOTE').value = Math.round(ann * COMMISSION_PCT / 12);   // monthly commission OTE (30%)
   recalc();
   scheduleSave();
 }
