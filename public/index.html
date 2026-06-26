@@ -614,9 +614,11 @@ function hydrateProfile(p) {
 
 // Compensation structure: 70/30 plan (70% base, 30% commission-eligible)
 var COMMISSION_PCT = 0.30;
+var _commOteOverride = null;  // set by buildDashboard when admin views another SE
 
 function commMonthlyOTE() {
-  return Math.round((profile.annualOTE || 0) * COMMISSION_PCT / 12);
+  var base = _commOteOverride !== null ? _commOteOverride : (profile.annualOTE || 0);
+  return Math.round(base * COMMISSION_PCT / 12);
 }
 
 // Monthly period model (MRR-based comp).
@@ -929,7 +931,7 @@ function seedRegionQuotasFromProfiles(profiles) {
 function adminProfileMetrics(p, q) {
   var regionKey = normRegion(p.region);
   var quota = regionQuota(regionKey, q);
-  var ote = p.monthlyOTE || p.quarterlyOTE || 0;
+  var ote = Math.round((p.annualOTE || 0) * COMMISSION_PCT / 12);
   var rp = adminRegionPoolsCache[regionKey];
   var sePool = (rp && rp.aes) ? rp.aes.map(function(a) {
     return { name: a.name, cw: a.cwUSD || 0, type: a.type, aeRegion: a.aeRegion };
@@ -1234,11 +1236,22 @@ function buildDashboard() {
   var fx   = 1.0;
   var isAll = dashIsAll();
   var quota = dashQuota(q);
-  var ote  = commMonthlyOTE();   // monthly commission OTE (30% of annual)
+
+  // If admin is viewing another SE via "View As IC", use their annualOTE for commission calculations
+  var icSelName = document.getElementById('icSE') && document.getElementById('icSE').value;
+  if (currentUserIsAdmin() && isICView() && icSelName && icSelName !== profile.displayName) {
+    var seProf = (adminProfilesCache || []).find(function(p) { return p.displayName === icSelName; });
+    _commOteOverride = seProf ? (seProf.annualOTE || 0) : null;
+  } else {
+    _commOteOverride = null;
+  }
+  var ote  = commMonthlyOTE();   // monthly commission OTE (30% of annual, may use override for viewed SE)
 
   // Settings panel — OTE editable; quota & FX are region-derived (read-only).
-  document.getElementById('annOTE').value  = profile.annualOTE || 0;
-  document.getElementById('qOTE').value    = ote;
+  var displayAnnualOTE = _commOteOverride !== null ? _commOteOverride : (profile.annualOTE || 0);
+  var displayMonthlyOTE = Math.round(displayAnnualOTE * COMMISSION_PCT / 12);
+  document.getElementById('annOTE').value  = displayAnnualOTE;
+  document.getElementById('qOTE').value    = displayMonthlyOTE;
   document.getElementById('seQuota').value = quota;
   document.getElementById('fxRate').value  = fx;
   document.getElementById('seQuota').disabled = true;
@@ -2302,7 +2315,7 @@ function showRegionDetail(regionKey) {
     seTable.appendChild(seHead);
     var seBody = document.createElement('tbody');
     m.ses.forEach(function(se) {
-      var ote = se.monthlyOTE || se.quarterlyOTE || 0;
+      var ote = Math.round((se.annualOTE || 0) * COMMISSION_PCT / 12);
       var pay = payout(poolUSD, quota, ote).pay;
       var tr = document.createElement('tr');
       tr.className = 'border-t border-slate-100';
