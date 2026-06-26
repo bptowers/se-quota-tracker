@@ -1339,6 +1339,28 @@ function loadIcMonthlyData(callback) {
 
 var monthlyAttChartInst = null;
 
+var attChartLabelsPlugin = {
+  id: 'attChartLabels',
+  afterDatasetsDraw: function(chart) {
+    var ctx = chart.ctx;
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = 'rgba(51,65,85,1)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    var dataset = chart.data.datasets[0];
+    var meta = chart.getDatasetMeta(0);
+    meta.data.forEach(function(bar, i) {
+      var m = MONTH_KEYS[i];
+      var quota = profileMonthlyQuota(m);
+      var cw = dataset.data[i];
+      var att = quota > 0 ? Math.round(cw / quota * 100) : 0;
+      var x = bar.x;
+      var y = bar.y - 4;
+      ctx.fillText(att + '%', x, y);
+    });
+  }
+};
+
 function buildMonthlyAttChart(data) {
   var canvas = document.getElementById('monthlyAttCanvas');
   if (!canvas) return;
@@ -1418,7 +1440,8 @@ function buildMonthlyAttChart(data) {
               ];
             }
           }
-        }
+        },
+        attChartLabels: {}
       },
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 10 } } },
@@ -1430,7 +1453,8 @@ function buildMonthlyAttChart(data) {
           grid: { color: 'rgba(226,232,240,0.8)' }
         }
       }
-    }
+    },
+    plugins: [attChartLabelsPlugin]
   });
 }
 
