@@ -1373,7 +1373,7 @@ function buildMonthlyAttChart(data) {
   var canvas = document.getElementById('monthlyAttCanvas');
   if (!canvas) return;
   if (monthlyAttChartInst) { monthlyAttChartInst.destroy(); monthlyAttChartInst = null; }
-  var ote = profile.monthlyOTE || Math.round((profile.annualOTE || 0) / 12);
+  var ote = commMonthlyOTE();
   var curM = document.getElementById('qSel').value;
   var barColors = [], borderColors = [], barData = [], quotaData = [];
   MONTH_KEYS.forEach(function(m) {
