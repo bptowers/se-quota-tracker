@@ -325,39 +325,13 @@
           <div style="position:relative;height:220px"><canvas id="monthlyAttCanvas"></canvas></div>
         </div>
 
-        <!-- AE Revenue Pool -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
-            <div>
-              <h2 class="font-semibold text-slate-800 text-sm">AE Revenue Pool</h2>
-              <p class="text-xs text-slate-400 mt-0.5">Closed Won (USD) synced from BigQuery · <span id="poolSyncNote">—</span></p>
-            </div>
+        <!-- Monthly Commission Chart (IC view only) -->
+        <div id="monthlyCommCard" class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 hidden">
+          <div class="flex justify-between items-center mb-2">
+            <h2 class="font-semibold text-slate-800 text-sm">2026 Monthly Commission Earned</h2>
+            <span id="monthlyCommNote" class="text-xs text-slate-400"></span>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-slate-50">
-                <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-slate-500">AE Name</th>
-                  <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Type</th>
-                  <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Closed Won $</th>
-                </tr>
-              </thead>
-              <tbody id="aeBody"></tbody>
-              <tfoot class="bg-slate-50 border-t-2 border-slate-200">
-                <tr>
-                  <td colspan="2" class="px-4 py-2 text-xs font-semibold text-slate-600">Pool Total</td>
-                  <td class="px-2 py-2 text-center text-xs font-mono font-bold text-slate-700" id="ftClosed">—</td>
-                </tr>
-                <tr>
-                  <td colspan="4" class="px-4 py-1.5 text-xs" id="poolGap">—</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          <div class="px-4 py-2 bg-slate-50 border-t border-slate-100 flex gap-4 text-xs text-slate-500">
-            <span>Pool (USD): <strong id="poolUSD" class="text-slate-700">$0</strong></span>
-            <span>FX rate: <strong id="fxDisp" class="text-slate-700">1.00</strong></span>
-          </div>
+          <div style="position:relative;height:180px"><canvas id="monthlyCommCanvas"></canvas></div>
         </div>
 
         <!-- Earned Commission This Month -->
@@ -394,6 +368,41 @@
         <div id="gapToQuotaCard" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
           <h2 class="font-semibold text-slate-800 text-sm mb-3">Closed Won Gap to Milestones</h2>
           <div id="gapRows" class="space-y-2 text-xs"></div>
+        </div>
+
+        <!-- AE Revenue Pool -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+            <div>
+              <h2 class="font-semibold text-slate-800 text-sm">AE Revenue Pool</h2>
+              <p class="text-xs text-slate-400 mt-0.5">Closed Won (USD) synced from BigQuery · <span id="poolSyncNote">—</span></p>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50">
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-slate-500">AE Name</th>
+                  <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Type</th>
+                  <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Closed Won $</th>
+                </tr>
+              </thead>
+              <tbody id="aeBody"></tbody>
+              <tfoot class="bg-slate-50 border-t-2 border-slate-200">
+                <tr>
+                  <td colspan="2" class="px-4 py-2 text-xs font-semibold text-slate-600">Pool Total</td>
+                  <td class="px-2 py-2 text-center text-xs font-mono font-bold text-slate-700" id="ftClosed">—</td>
+                </tr>
+                <tr>
+                  <td colspan="4" class="px-4 py-1.5 text-xs" id="poolGap">—</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div class="px-4 py-2 bg-slate-50 border-t border-slate-100 flex gap-4 text-xs text-slate-500">
+            <span>Pool (USD): <strong id="poolUSD" class="text-slate-700">$0</strong></span>
+            <span>FX rate: <strong id="fxDisp" class="text-slate-700">1.00</strong></span>
+          </div>
         </div>
 
       </div>
@@ -1284,7 +1293,7 @@ function buildDashboard() {
 
   // IC analytics widgets (shown for all SE views, hidden on All-regions admin view)
   var showIcCharts = !isAll;
-  ['monthlyAttCard','quarterlyCard','scenarioCard'].forEach(function(id) {
+  ['monthlyAttCard','monthlyCommCard','quarterlyCard','scenarioCard'].forEach(function(id) {
     var el2 = document.getElementById(id);
     if (el2) el2.classList.toggle('hidden', !showIcCharts);
   });
@@ -1293,6 +1302,7 @@ function buildDashboard() {
     if (attNote) attNote.textContent = 'Loading…';
     loadIcMonthlyData(function(gdata) {
       buildMonthlyAttChart(gdata);
+      buildMonthlyCommChart(gdata);
       buildQuarterlySummary(gdata);
       var scenIn = document.getElementById('scenarioCW');
       var curM = document.getElementById('qSel').value;
@@ -1405,6 +1415,101 @@ function buildMonthlyAttChart(data) {
                 'CW: $' + Math.round(cw).toLocaleString(),
                 'Attainment: ' + att + '%',
                 'Commission: $' + Math.round(comm).toLocaleString()
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: {
+          ticks: {
+            font: { size: 10 },
+            callback: function(v) { return '$' + (v >= 1000 ? Math.round(v / 1000) + 'k' : v); }
+          },
+          grid: { color: 'rgba(226,232,240,0.8)' }
+        }
+      }
+    }
+  });
+}
+
+var monthlyCommChartInst = null;
+
+function buildMonthlyCommChart(data) {
+  var canvas = document.getElementById('monthlyCommCanvas');
+  if (!canvas) return;
+  if (monthlyCommChartInst) { monthlyCommChartInst.destroy(); monthlyCommChartInst = null; }
+  var ote = profile.monthlyOTE || Math.round((profile.annualOTE || 0) / 12);
+  var curM = document.getElementById('qSel').value;
+  var barColors = [], borderColors = [], commData = [], oteLineData = [];
+  MONTH_KEYS.forEach(function(m) {
+    var cw = data[m] || 0;
+    var quota = profileMonthlyQuota(m);
+    var att = quota > 0 ? cw / quota : 0;
+    var comm = quota > 0 ? payout(cw, quota, ote).pay : 0;
+    var isFuture = !data.hasOwnProperty(m);
+    commData.push(isFuture ? 0 : comm);
+    oteLineData.push(ote);
+    if (isFuture) {
+      barColors.push('rgba(203,213,225,0.5)');
+      borderColors.push('rgba(203,213,225,0.8)');
+    } else if (att >= 1.0) {
+      barColors.push('rgba(34,197,94,0.7)');
+      borderColors.push(m === curM ? 'rgb(22,163,74)' : 'rgba(34,197,94,0.9)');
+    } else if (att >= 0.8) {
+      barColors.push('rgba(251,146,60,0.7)');
+      borderColors.push(m === curM ? 'rgb(234,88,12)' : 'rgba(251,146,60,0.9)');
+    } else {
+      barColors.push('rgba(59,130,246,0.6)');
+      borderColors.push(m === curM ? 'rgb(37,99,235)' : 'rgba(59,130,246,0.85)');
+    }
+  });
+  var labels = MONTH_KEYS.map(function(m) { return MONTHS[m].label.slice(0, 3); });
+  monthlyCommChartInst = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Commission',
+          data: commData,
+          backgroundColor: barColors,
+          borderColor: borderColors,
+          borderWidth: 2,
+          borderRadius: 4,
+          order: 2
+        },
+        {
+          label: 'Monthly OTE',
+          data: oteLineData,
+          type: 'line',
+          borderColor: 'rgba(100,116,139,0.7)',
+          borderWidth: 1.5,
+          borderDash: [5, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              if (ctx.datasetIndex === 1) return 'Monthly OTE: $' + Math.round(ctx.parsed.y).toLocaleString();
+              var m = MONTH_KEYS[ctx.dataIndex];
+              var quota = profileMonthlyQuota(m);
+              var cw = data[m] || 0;
+              var att = quota > 0 ? (cw / quota * 100).toFixed(1) : '—';
+              return [
+                'Commission: $' + Math.round(ctx.parsed.y).toLocaleString(),
+                'Attainment: ' + att + '%'
               ];
             }
           }
