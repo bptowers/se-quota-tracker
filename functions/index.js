@@ -168,7 +168,7 @@ exports.geminiChat = onCall(
 
     // Call Gemini 1.5 Flash API
     const apiKey = geminiApiKey.value();
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
     const body = JSON.stringify({
       contents: messages,
@@ -177,13 +177,17 @@ exports.geminiChat = onCall(
 
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
       body: body
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new HttpsError('internal', 'Gemini API error: ' + errText);
+      console.error('Gemini API error:', errText);
+      throw new HttpsError('internal', 'Upstream AI service error');
     }
 
     const data = await response.json();
