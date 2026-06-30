@@ -241,11 +241,6 @@
       <option value="2026-11">Nov 2026</option>
       <option value="2026-12">Dec 2026</option>
     </select>
-    <!-- Monthly/Quarterly toggle -->
-    <div class="flex gap-1 ml-2 bg-slate-700/60 rounded-lg p-0.5 border border-slate-600/50">
-      <button onclick="setViewPeriod('monthly')" id="periodMonthly" class="px-2.5 py-0.5 text-xs font-medium rounded text-slate-200 bg-slate-600 transition-all">Monthly</button>
-      <button onclick="setViewPeriod('quarterly')" id="periodQuarterly" class="px-2.5 py-0.5 text-xs font-medium rounded text-slate-400 hover:text-slate-200 transition-all">Quarterly</button>
-    </div>
     <button id="btnSE"    onclick="showTab('se')"    class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium ml-2">My Dashboard</button>
     <button id="btnAdmin"  onclick="showTab('admin')"  class="text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium hidden">Team View</button>
     <button id="btnReport" onclick="showTab('report')" class="text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium ml-1 hidden">Report</button>
@@ -620,32 +615,10 @@ function hydrateProfile(p) {
 // Compensation structure: 70/30 plan (70% base, 30% commission-eligible)
 var COMMISSION_PCT = 0.30;
 var _commOteOverride = null;  // set by buildDashboard when admin views another SE
-var viewPeriod = 'monthly';   // 'monthly' or 'quarterly' — toggle state
 
 function commMonthlyOTE() {
   var base = _commOteOverride !== null ? _commOteOverride : (profile.annualOTE || 0);
   return Math.round(base * COMMISSION_PCT / 12);
-}
-
-function commQuarterlyOTE() {
-  var base = _commOteOverride !== null ? _commOteOverride : (profile.annualOTE || 0);
-  return Math.round(base * COMMISSION_PCT / 4);
-}
-
-function dashQuarterlyQuota(q) {
-  var qNum = Math.ceil(parseInt(q.slice(5), 10) / 3);
-  return profile && profile.quotas ? (profile.quotas['Q' + qNum] || 0) : 0;
-}
-
-function getQuarterMonths(m) {
-  var mNum = parseInt(m.slice(5), 10);
-  var qNum = Math.ceil(mNum / 3);
-  var startMonth = (qNum - 1) * 3 + 1;
-  return [
-    m.slice(0, 5) + String(startMonth).padStart(2, '0'),
-    m.slice(0, 5) + String(startMonth + 1).padStart(2, '0'),
-    m.slice(0, 5) + String(startMonth + 2).padStart(2, '0')
-  ];
 }
 
 // Monthly period model (MRR-based comp).
@@ -2009,90 +1982,6 @@ function buildRegionQuotaEditor() {
   panel.appendChild(card);
 }
 
-// ── PERIOD TOGGLE ──────────────────────────────────────
-function setViewPeriod(period) {
-  viewPeriod = period;
-  document.getElementById('periodMonthly').className = period === 'monthly'
-    ? 'px-2.5 py-0.5 text-xs font-medium rounded text-slate-200 bg-slate-600 transition-all'
-    : 'px-2.5 py-0.5 text-xs font-medium rounded text-slate-400 hover:text-slate-200 transition-all';
-  document.getElementById('periodQuarterly').className = period === 'quarterly'
-    ? 'px-2.5 py-0.5 text-xs font-medium rounded text-slate-200 bg-slate-600 transition-all'
-    : 'px-2.5 py-0.5 text-xs font-medium rounded text-slate-400 hover:text-slate-200 transition-all';
-  if (period === 'quarterly') recalcQuarterly();
-  else recalc();
-}
-
-function recalcQuarterly() {
-  var q = document.getElementById('qSel').value;
-  var qNum = Math.ceil(parseInt(q.slice(5), 10) / 3);
-  var qQuota = (profile && profile.quotas) ? (profile.quotas['Q' + qNum] || 0) : 0;
-  var qOte = commQuarterlyOTE();
-  var sym = '$';
-  var fx = 1.0;
-
-  // Sum CW from all 3 months of this quarter
-  var quarterMonths = getQuarterMonths(q);
-  var cachedData = icMonthlyDataCache[dashSelection()] || {};
-  var qCW = 0;
-  quarterMonths.forEach(function(m) { qCW += cachedData[m] || 0; });
-
-  // Sum commission from 3 monthly payouts
-  var qComm = 0;
-  quarterMonths.forEach(function(m) {
-    var mQuota = profileMonthlyQuota(m);
-    var mCW = cachedData[m] || 0;
-    var mOte = commMonthlyOTE();
-    qComm += payout(mCW, mQuota, mOte).pay;
-  });
-
-  var res = payout(qCW, qQuota, qOte);
-  var att = res.att;
-  var attPct = (att * 100).toFixed(2);
-
-  // KPIs (same tiles as monthly)
-  document.getElementById('kpiAtt').textContent = attPct + '%';
-  document.getElementById('kpiAtt').className = 'text-sm font-bold leading-tight ' + attColor(att);
-  document.getElementById('kpiAttSub').textContent = fmt(qCW) + ' of ' + fmt(qQuota);
-  document.getElementById('kpiAttBar').style.width = Math.min(att * 100, 100) + '%';
-  document.getElementById('kpiAttBar').className = 'h-full rounded-full transition-all ' + barColor(att);
-  document.getElementById('kpiComm').textContent = dashIsAll() ? '—' : fmt(qComm);
-  document.getElementById('kpiOTE').textContent = dashIsAll() ? '—' : fmt(qOte);
-
-  var badges = att >= 2   ? ['bg-purple-100 text-purple-700', '200%+ Cap 🚀']
-             : att >= 1   ? ['bg-green-100 text-green-700',   'Quota Hit ✓']
-             : att >= 0.8 ? ['bg-blue-100 text-blue-700',     'On Track']
-             :              ['bg-slate-100 text-slate-600',   'Building'];
-  document.getElementById('kpiStatus').innerHTML = '<span class="inline-block text-xs font-bold px-2 py-0.5 rounded-full ' + badges[0] + '">' + badges[1] + '</span>';
-  document.getElementById('kpiStatusSub').textContent = att >= 1
-    ? 'At or above quota'
-    : fmt(Math.max(0, qQuota - qCW)) + ' to 100%';
-
-  // Progress bar
-  document.getElementById('pbFill').style.width = Math.min(att, 1.05) * 100 + '%';
-  document.getElementById('pbFill').className = 'absolute inset-y-0 left-0 rounded-full transition-all ' + barColor(att);
-  document.getElementById('pbLabel').textContent = attPct + '%';
-  document.getElementById('pb60').textContent = fmt(0) + ' (0%)';
-  document.getElementById('pb80').textContent = fmt(qQuota * 0.8) + ' (80%)';
-  document.getElementById('pb100').textContent = fmt(qQuota) + ' (100%)';
-
-  // AE footer (quarterly context)
-  document.getElementById('ftClosed').textContent = sym + Math.round(qCW).toLocaleString();
-  document.getElementById('poolUSD').textContent = fmt(qCW);
-  document.getElementById('fxDisp').textContent = '$' + fx.toFixed(3);
-  var gapToQuotaNative = Math.max(0, Math.ceil(qQuota / fx - qCW));
-  document.getElementById('poolGap').innerHTML = att >= 1
-    ? '<span class="text-green-600 font-semibold">✓ Quota hit</span> — earned ' + fmt(qComm)
-    : '<strong class="text-slate-700">' + sym + gapToQuotaNative.toLocaleString() + '</strong> more to reach 100% quarterly quota';
-
-  // Nav KPI: Net Topline
-  var navToplineEl = document.getElementById('navKpiTopline');
-  if (navToplineEl) navToplineEl.textContent = fmt(qCW);
-
-  // Update earned commission and gap cards to quarterly labels
-  buildEarnedCommCardQ(qComm, qOte, quarterMonths);
-  buildGapToQuotaCardQ(qCW, qQuota, qOte);
-}
-
 // ── RECALCULATE ────────────────────────────────────────
 function recalc() {
   var quota = parseFloat(document.getElementById('seQuota').value) || 0;
@@ -2565,110 +2454,6 @@ function buildGapToQuotaCard(currentCW, currentQuota, ote) {
 
     rowsEl.appendChild(row);
   });
-}
-
-function buildEarnedCommCardQ(qComm, qOte, quarterMonths) {
-  var card = document.getElementById('earnedCommCard');
-  if (!card) return;
-  while (card.firstChild) card.removeChild(card.firstChild);
-  var title = document.createElement('h2');
-  title.className = 'font-semibold text-slate-800 text-sm mb-3';
-  title.textContent = 'Commission Earned This Quarter';
-  card.appendChild(title);
-
-  var div = document.createElement('div');
-  div.className = 'space-y-2';
-
-  var earned = document.createElement('div');
-  earned.className = 'flex justify-between items-baseline mb-1';
-  var label = document.createElement('span');
-  label.className = 'text-xs text-slate-600';
-  label.textContent = 'Earned so far';
-  var val = document.createElement('span');
-  val.className = 'font-mono font-bold text-green-700 text-sm';
-  val.textContent = fmt(qComm);
-  earned.appendChild(label);
-  earned.appendChild(val);
-  div.appendChild(earned);
-
-  var bar = document.createElement('div');
-  bar.className = 'h-3 bg-slate-100 rounded-full overflow-hidden';
-  var barFill = document.createElement('div');
-  barFill.className = 'h-full bg-green-500 transition-all rounded-full';
-  barFill.style.width = Math.min(100, (qComm / qOte * 100)) + '%';
-  bar.appendChild(barFill);
-  div.appendChild(bar);
-
-  var pace = document.createElement('div');
-  pace.className = 'bg-slate-50 rounded-lg px-3 py-2';
-  var paceLabel = document.createElement('div');
-  paceLabel.className = 'flex justify-between text-xs mb-0.5';
-  var pL = document.createElement('span');
-  pL.className = 'text-slate-500';
-  pL.textContent = 'Quarterly OTE';
-  var pV = document.createElement('span');
-  pV.className = 'font-mono text-slate-700';
-  pV.textContent = fmt(qOte);
-  paceLabel.appendChild(pL);
-  paceLabel.appendChild(pV);
-  pace.appendChild(paceLabel);
-  var paceNote = document.createElement('div');
-  paceNote.className = 'text-[10px] text-slate-400';
-  paceNote.textContent = '100% quarterly target';
-  pace.appendChild(paceNote);
-  div.appendChild(pace);
-
-  card.appendChild(div);
-}
-
-function buildGapToQuotaCardQ(qCW, qQuota, qOte) {
-  var card = document.getElementById('gapToQuotaCard');
-  if (!card) return;
-  while (card.firstChild) card.removeChild(card.firstChild);
-  var title = document.createElement('h2');
-  title.className = 'font-semibold text-slate-800 text-sm mb-3';
-  title.textContent = 'Closed Won Gap to Milestones (Quarterly)';
-  card.appendChild(title);
-
-  var rowsEl = document.createElement('div');
-  rowsEl.className = 'space-y-2 text-xs';
-
-  var milestones = [0.5, 0.8, 1.0, 1.5, 2.0];
-  milestones.forEach(function(pct) {
-    var targetCW = qQuota * pct;
-    var gap = Math.max(0, targetCW - qCW);
-    var commAtMilestone = payout(targetCW, qQuota, qOte).pay;
-    var exceeded = qCW >= targetCW;
-
-    var row = document.createElement('div');
-    row.className = 'rounded-lg bg-slate-50 px-3 py-2.5 border ' + (exceeded ? 'border-green-100' : 'border-slate-100');
-
-    var top = document.createElement('div');
-    top.className = 'flex justify-between items-center mb-1';
-    var label = document.createElement('span');
-    label.className = 'text-slate-600';
-    label.textContent = Math.round(pct * 100) + '% quarterly quota';
-    top.appendChild(label);
-
-    var gapSpan = document.createElement('span');
-    gapSpan.className = 'font-mono text-slate-700';
-    if (exceeded && targetCW <= qCW) {
-      gapSpan.textContent = '✓ Hit';
-    } else {
-      gapSpan.textContent = 'Need $' + Math.round(gap).toLocaleString();
-    }
-    top.appendChild(gapSpan);
-    row.appendChild(top);
-
-    var comm = document.createElement('div');
-    comm.className = 'text-[10px] text-slate-400';
-    comm.textContent = 'Commission at this point: ' + fmt(commAtMilestone);
-    row.appendChild(comm);
-
-    rowsEl.appendChild(row);
-  });
-
-  card.appendChild(rowsEl);
 }
 
 // ── SAMPLE REPORT ──────────────────────────────────────
