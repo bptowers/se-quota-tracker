@@ -147,3 +147,47 @@ exports.bqManualSync = onCall(async (request) => {
   }
   return runSync();
 });
+
+// ── Callable: Comp Plan AI chat with Gemini (2nd-gen) ────────────────────────
+const { defineSecret } = require('firebase-functions/params');
+const geminiApiKey = defineSecret('GEMINI_API_KEY');
+
+exports.geminiChat = onCall(
+  { secrets: [geminiApiKey] },
+  async (request) => {
+    // Auth check — any logged-in user
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Must be signed in');
+    }
+
+    // Validate payload
+    const { messages } = request.data;
+    if (!Array.isArray(messages) || messages.length === 0) {
+      throw new HttpsError('invalid-argument', 'messages array required');
+    }
+
+    // Call Gemini 1.5 Flash API
+    const apiKey = geminiApiKey.value();
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    const body = JSON.stringify({
+      contents: messages,
+      generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
+    });
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new HttpsError('internal', 'Gemini API error: ' + errText);
+    }
+
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return { reply: text };
+  }
+);
