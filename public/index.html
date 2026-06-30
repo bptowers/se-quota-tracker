@@ -6,7 +6,6 @@
 <title>SE Quota Tracker</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -245,7 +244,6 @@
     <button id="btnSE"    onclick="showTab('se')"    class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium ml-2">My Dashboard</button>
     <button id="btnAdmin"  onclick="showTab('admin')"  class="text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium hidden">Team View</button>
     <button id="btnReport" onclick="showTab('report')" class="text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium ml-1 hidden">Report</button>
-    <button id="btnComp"   onclick="showTab('comp')"   class="text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium ml-1">Comp Plan AI</button>
     <div id="saveInd" class="text-xs text-slate-400 ml-2"></div>
     <button onclick="doSignOut()" class="text-xs text-slate-400 hover:text-white ml-2">Sign out</button>
   </nav>
@@ -515,48 +513,6 @@
 
   </div>
 
-  <!-- Comp Plan AI Tab -->
-  <div id="tabComp" class="hidden max-w-4xl mx-auto px-4 py-6">
-
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-xl font-bold text-slate-800">Comp Plan Assistant</h1>
-        <p class="text-sm text-slate-400 mt-0.5">Upload your comp plan PDF and ask questions about it</p>
-      </div>
-      <span id="compPlanBadge" class="hidden text-xs bg-green-100 text-green-700 font-semibold px-3 py-1.5 rounded-full border border-green-200">Plan loaded</span>
-    </div>
-
-    <!-- Upload Zone -->
-    <div id="compUploadZone" class="bg-white rounded-xl border-2 border-dashed border-slate-300 p-10 text-center mb-6 hover:border-blue-400 transition-colors cursor-pointer">
-      <div id="compUploadInner">
-        <!-- Content built by JS using DOM methods -->
-      </div>
-      <input id="compFileInput" type="file" accept=".pdf" class="hidden">
-    </div>
-
-    <!-- Chat Area — hidden until PDF loaded -->
-    <div id="compChatArea" class="hidden">
-      <!-- Messages container -->
-      <div id="compMessages" class="bg-white rounded-xl border border-slate-200 shadow-sm mb-4 overflow-y-auto" style="min-height:300px;max-height:480px;">
-        <!-- Messages appended here by JS -->
-      </div>
-
-      <!-- Input row -->
-      <div class="flex gap-3">
-        <textarea id="compInput" rows="2"
-          placeholder="Ask a question about your comp plan..."
-          class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea>
-        <button id="compSendBtn" onclick="compSend()"
-          class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm self-end disabled:opacity-50 disabled:cursor-not-allowed">
-          Send
-        </button>
-      </div>
-      <p class="text-xs text-slate-400 mt-2">Press Enter to send · Shift+Enter for new line</p>
-    </div>
-
-  </div>
-
   <!-- Toast -->
   <div id="toast" class="fixed bottom-4 right-4 bg-slate-800 text-white text-xs px-4 py-2 rounded-lg shadow-lg hidden">Saved ✓</div>
 </div>
@@ -579,12 +535,6 @@ firebase.initializeApp(firebaseConfig);
 var fbAuth = firebase.auth();
 var db     = firebase.firestore();
 var lastHandledAuthUid = null;
-
-// PDF.js worker setup
-if (typeof pdfjsLib !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-}
 
 var ALLOWED_DOMAINS = ['simprogroup.com','simpro.us','simpro.au','simpro.nz','bigchange.com','clockshark.com'];
 
@@ -665,11 +615,6 @@ function hydrateProfile(p) {
 // Compensation structure: 70/30 plan (70% base, 30% commission-eligible)
 var COMMISSION_PCT = 0.30;
 var _commOteOverride = null;  // set by buildDashboard when admin views another SE
-
-// Comp Plan AI state
-var compPdfText    = '';       // extracted plain text from the uploaded PDF
-var compHistory    = [];       // Gemini conversation history [{ role, parts }]
-var compLoading    = false;    // debounce flag
 
 function commMonthlyOTE() {
   var base = _commOteOverride !== null ? _commOteOverride : (profile.annualOTE || 0);
@@ -2226,12 +2171,10 @@ function showTab(t) {
   document.getElementById('tabSE').classList.toggle('hidden',     t !== 'se');
   document.getElementById('tabAdmin').classList.toggle('hidden',  t !== 'admin');
   document.getElementById('tabReport').classList.toggle('hidden', t !== 'report');
-  document.getElementById('tabComp').classList.toggle('hidden',   t !== 'comp');
 
   var active   = 'text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium ml-2';
   var inactive = 'text-xs px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 font-medium ml-2';
   document.getElementById('btnSE').className     = t === 'se'     ? active : inactive;
-  document.getElementById('btnComp').className   = t === 'comp'   ? active : inactive;
 
   var btnAdmin = document.getElementById('btnAdmin');
   var btnReport = document.getElementById('btnReport');
@@ -2247,7 +2190,6 @@ function showTab(t) {
 
   if (t === 'admin')  buildAdminView();
   if (t === 'report') buildReportTab();
-  if (t === 'comp')   initCompTab();
 }
 
 function buildAdminView() {
@@ -2870,190 +2812,6 @@ function buildReportChart(seList) {
       }
     }
   });
-}
-
-// ── COMP PLAN AI ───────────────────────────────────────
-function initCompTab() {
-  var inner = document.getElementById('compUploadInner');
-  if (!inner || inner.hasChildNodes()) return;
-
-  var icon = document.createElement('div');
-  icon.className = 'text-5xl mb-3';
-  icon.textContent = '📄';  // 📄
-
-  var title = document.createElement('p');
-  title.className = 'font-semibold text-slate-700 mb-1';
-  title.textContent = 'Drop your Comp Plan PDF here';
-
-  var sub = document.createElement('p');
-  sub.className = 'text-sm text-slate-400';
-  sub.textContent = 'or click to browse · PDF only';
-
-  inner.appendChild(icon);
-  inner.appendChild(title);
-  inner.appendChild(sub);
-
-  var zone = document.getElementById('compUploadZone');
-  zone.onclick = function() { document.getElementById('compFileInput').click(); };
-  zone.ondragover = function(e) {
-    e.preventDefault();
-    zone.classList.add('border-blue-400');
-  };
-  zone.ondragleave = function() {
-    zone.classList.remove('border-blue-400');
-  };
-  zone.ondrop = function(e) {
-    e.preventDefault();
-    zone.classList.remove('border-blue-400');
-    var file = e.dataTransfer.files[0];
-    if (file) compProcessFile(file);
-  };
-
-  document.getElementById('compFileInput').onchange = function(e) {
-    if (e.target.files[0]) compProcessFile(e.target.files[0]);
-  };
-
-  document.getElementById('compInput').onkeydown = function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      compSend();
-    }
-  };
-}
-
-function compProcessFile(file) {
-  if (!file || file.type !== 'application/pdf') {
-    compShowUploadStatus('Only PDF files are supported.', 'error');
-    return;
-  }
-
-  compShowUploadStatus('Extracting text from PDF…', 'loading');
-
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var typedArray = new Uint8Array(e.target.result);
-    pdfjsLib.getDocument({ data: typedArray }).promise
-      .then(function(pdf) {
-        var pagePromises = [];
-        for (var i = 1; i <= pdf.numPages; i++) {
-          pagePromises.push(
-            pdf.getPage(i).then(function(page) {
-              return page.getTextContent().then(function(tc) {
-                return tc.items.map(function(item) { return item.str; }).join(' ');
-              });
-            })
-          );
-        }
-        return Promise.all(pagePromises);
-      })
-      .then(function(pages) {
-        compPdfText = pages.join('\n\n');
-        compHistory = [];
-        compShowChatReady(file.name);
-      })
-      .catch(function(err) {
-        compShowUploadStatus('Could not read PDF: ' + err.message, 'error');
-      });
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function compShowUploadStatus(msg, type) {
-  var inner = document.getElementById('compUploadInner');
-  while (inner.firstChild) inner.removeChild(inner.firstChild);
-  var p = document.createElement('p');
-  p.className = type === 'error' ? 'text-red-500 text-sm' : 'text-slate-500 text-sm';
-  p.textContent = msg;
-  inner.appendChild(p);
-}
-
-function compShowChatReady(filename) {
-  var inner = document.getElementById('compUploadInner');
-  while (inner.firstChild) inner.removeChild(inner.firstChild);
-
-  var check = document.createElement('p');
-  check.className = 'text-green-600 font-medium text-sm';
-  check.textContent = '✓ ' + filename + ' loaded';
-  inner.appendChild(check);
-
-  var hint = document.createElement('p');
-  hint.className = 'text-xs text-slate-400 mt-1';
-  hint.textContent = 'Click to replace with a different PDF';
-  inner.appendChild(hint);
-
-  document.getElementById('compPlanBadge').classList.remove('hidden');
-
-  var msgs = document.getElementById('compMessages');
-  while (msgs.firstChild) msgs.removeChild(msgs.firstChild);
-
-  compAppendMessage('model', 'Your comp plan is loaded. Ask me anything about it — commission rates, quota thresholds, accelerators, payment timing, or anything else.');
-
-  document.getElementById('compChatArea').classList.remove('hidden');
-  document.getElementById('compInput').focus();
-}
-
-function compAppendMessage(role, text) {
-  var msgs = document.getElementById('compMessages');
-  var isUser = role === 'user';
-
-  var wrapper = document.createElement('div');
-  wrapper.className = 'flex ' + (isUser ? 'justify-end' : 'justify-start') + ' px-4 py-3';
-
-  var bubble = document.createElement('div');
-  bubble.className = isUser
-    ? 'bg-blue-600 text-white rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[75%] text-sm'
-    : 'bg-slate-100 text-slate-800 rounded-2xl rounded-tl-md px-4 py-2.5 max-w-[80%] text-sm';
-
-  var msgText = document.createElement('span');
-  msgText.className = 'comp-msg-text whitespace-pre-wrap';
-  msgText.textContent = text;
-  bubble.appendChild(msgText);
-  wrapper.appendChild(bubble);
-  msgs.appendChild(wrapper);
-
-  msgs.scrollTop = msgs.scrollHeight;
-  return wrapper;
-}
-
-function compSend() {
-  if (compLoading || !compPdfText) return;
-  var input = document.getElementById('compInput');
-  var text = (input.value || '').trim();
-  if (!text) return;
-
-  input.value = '';
-  compLoading = true;
-  document.getElementById('compSendBtn').disabled = true;
-
-  var userText = text;
-  if (compHistory.length === 0) {
-    userText = 'You are an expert at interpreting sales compensation plans. ' +
-               'Here is the full text of my comp plan:\n\n' +
-               compPdfText +
-               '\n\n---\n\nMy question: ' + text;
-  }
-
-  compAppendMessage('user', text);
-  compHistory.push({ role: 'user', parts: [{ text: userText }] });
-
-  var typingEl = compAppendMessage('model', '…');
-  typingEl.id = 'compTyping';
-
-  firebase.functions().httpsCallable('geminiChat')({ messages: compHistory })
-    .then(function(result) {
-      var reply = (result.data && result.data.reply) || 'No response received.';
-      typingEl.querySelector('.comp-msg-text').textContent = reply;
-      typingEl.removeAttribute('id');
-      compHistory.push({ role: 'model', parts: [{ text: reply }] });
-    })
-    .catch(function(err) {
-      typingEl.querySelector('.comp-msg-text').textContent = 'Error: ' + (err.message || 'Unknown error');
-    })
-    .finally(function() {
-      compLoading = false;
-      document.getElementById('compSendBtn').disabled = false;
-      document.getElementById('compInput').focus();
-    });
 }
 
 </script>
