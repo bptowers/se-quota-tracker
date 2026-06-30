@@ -380,6 +380,7 @@
                   <th class="px-4 py-2 text-left text-xs font-medium text-slate-500">AE Name</th>
                   <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Type</th>
                   <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Closed Won $</th>
+                  <th class="px-2 py-2 text-center text-xs font-medium text-slate-500 cursor-help" title="% of your total quota. Each region's Closed Won as a percentage of your overall quota target — shows how much each region contributes to your total attainment.">% of Total</th>
                 </tr>
               </thead>
               <tbody id="aeBody"></tbody>
@@ -1780,7 +1781,8 @@ function buildAETable(sym) {
 
     var hAttTd = document.createElement('td');
     hAttTd.id = 'ratt_' + ri;
-    hAttTd.className = 'px-2 py-2 text-center text-xs font-mono font-semibold';
+    hAttTd.className = 'px-2 py-2 text-center text-xs font-mono font-semibold cursor-help';
+    hAttTd.title = region + '\'s Closed Won as a % of your total quota';
     if (quota > 0) {
       hAttTd.textContent = Math.round(rAtt * 100) + '%';
       hAttTd.className += ' ' + attColor(rAtt);
