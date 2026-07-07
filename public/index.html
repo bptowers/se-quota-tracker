@@ -488,6 +488,7 @@
       </div>
       <span class="text-xs bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-3 py-1">Global Leader View</span>
     </div>
+    <div id="forecastPanel" class="hidden mb-4"></div>
     <div id="syncLogPanel" class="hidden mb-4"></div>
     <div id="regionQuotaPanel" class="hidden mb-4"></div>
     <p id="adminEmpty" class="text-slate-400 text-sm hidden">No SE profiles found yet.</p>
@@ -2461,6 +2462,139 @@ function showTab(t) {
   if (t === 'report') buildReportTab();
 }
 
+// ── Quarter Forecast — Pace to Quota (RevOps view, top of Team View) ──────────
+// Per region: quarter-to-date Closed Won, a run-rate projection to quarter-end,
+// % to the region quota, and $ gap to 100%, plus a Global rollup. Run-rate is
+// noise in the first ~2 weeks of a quarter, so until then it shows the just-
+// completed quarter's FINAL result instead. Reads regionQuotaCfg (set by
+// buildAdminView) for quotas and fetches the target quarter's monthly pools.
+function buildForecastBoard() {
+  var panel = document.getElementById('forecastPanel');
+  if (!panel) return;
+  if (!seesAllRegions()) { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+  while (panel.firstChild) panel.removeChild(panel.firstChild);
+
+  var DAY = 86400000;
+  var todayStr = new Date().toISOString().slice(0, 10);
+  var today    = new Date(todayStr + 'T00:00:00');
+  function qMonths(qn) { return MONTH_KEYS.filter(function(m){ return Math.ceil(parseInt(m.slice(5), 10) / 3) === qn; }); }
+
+  var curQ = Math.ceil(parseInt(currentQuarterKey().slice(5), 10) / 3);
+  var curMonths = qMonths(curQ);
+  var curDaysElapsed = Math.round((today - new Date(MONTHS[curMonths[0]].start + 'T00:00:00')) / DAY) + 1;
+
+  // Project the live quarter once it has ~2 weeks of data; before that, show the
+  // prior (completed) quarter as final so early run-rate noise never misleads.
+  var mode, tQ;
+  if (curDaysElapsed >= 14 || curQ === 1) { mode = 'projection'; tQ = curQ; }
+  else { mode = 'final'; tQ = curQ - 1; }
+
+  var tMonths = qMonths(tQ);
+  var tStart  = new Date(MONTHS[tMonths[0]].start + 'T00:00:00');
+  var tEnd     = new Date(MONTHS[tMonths[tMonths.length - 1]].end + 'T00:00:00');
+  var elapsed  = tMonths.filter(function(m){ return MONTHS[m].start <= todayStr; });
+  var daysInQ  = Math.round((tEnd - tStart) / DAY) + 1;
+  var daysElap = Math.min(daysInQ, Math.max(1, Math.round((today - tStart) / DAY) + 1));
+  var pace     = mode === 'final' ? 1 : daysInQ / daysElap;
+
+  var card = cel('div', 'bg-white border border-slate-200 rounded-xl p-4');
+  var head = cel('div', 'flex items-start justify-between gap-3 mb-1');
+  app(head,
+    ctxt('h3', 'text-sm font-semibold text-slate-700',
+      '📈 Quarter Forecast — Q' + tQ + ' 2026 · ' + (mode === 'final' ? 'Final' : 'Pace to Quota')),
+    ctxt('span', 'text-xs text-slate-400',
+      mode === 'final' ? 'Quarter complete' : ('Day ' + daysElap + ' of ' + daysInQ)));
+  app(card, head);
+  app(card, ctxt('p', 'text-xs text-slate-400 mb-3',
+    mode === 'final' ? 'Final Closed Won MRR (USD) vs quota'
+                     : 'Projected at current run-rate · Closed Won MRR (USD)'));
+  var loadingNote = ctxt('div', 'text-slate-400 text-sm', 'Loading forecast…');
+  app(card, loadingNote);
+  panel.appendChild(card);
+  if (!elapsed.length) { loadingNote.textContent = 'No data for this quarter yet.'; return; }
+
+  var qtd = {}; REGION_KEYS.forEach(function(rk){ qtd[rk] = 0; });
+  var lastSync = null, pending = elapsed.length;
+  elapsed.forEach(function(m) {
+    fsGetRegionPoolsForQuarter(m, function(pools) {
+      REGION_KEYS.forEach(function(rk) {
+        var p = pools[rk];
+        if (!p) return;
+        qtd[rk] += p.totalCwUSD || 0;
+        if (p.lastBqSync && p.lastBqSync.toDate) {
+          var t = p.lastBqSync.toDate();
+          if (!lastSync || t > lastSync) lastSync = t;
+        }
+      });
+      if (--pending === 0) renderForecastTable(card, loadingNote, qtd, tQ, pace, mode, curQ, curDaysElapsed, lastSync);
+    });
+  });
+}
+
+function forecastRow(mode, label, cw, proj, quota, isTotal) {
+  var hasQuota = quota > 0;
+  var projPct  = hasQuota ? proj / quota : 0;
+  var gap      = hasQuota ? Math.max(0, quota - cw) : 0;
+  var tr = document.createElement('tr');
+  tr.className = 'border-t border-slate-100' + (isTotal ? ' font-semibold bg-slate-50' : '');
+  var badge = !hasQuota ? ['bg-slate-100 text-slate-500', 'set quota']
+            : projPct >= 1 ? ['bg-green-100 text-green-700', 'On track']
+            : projPct >= 0.8 ? ['bg-amber-100 text-amber-700', 'Watch']
+            : ['bg-red-100 text-red-700', 'At risk'];
+  var pctCls = !hasQuota ? 'text-slate-400'
+             : projPct >= 1 ? 'text-green-600' : projPct >= 0.8 ? 'text-amber-600' : 'text-red-600';
+  app(tr, ctxt('td', 'px-2 py-1.5 text-slate-700', label));
+  app(tr, ctxt('td', 'px-2 py-1.5 text-right font-mono text-slate-600', fmt(cw)));
+  if (mode === 'projection') app(tr, ctxt('td', 'px-2 py-1.5 text-right font-mono text-slate-800', fmt(proj)));
+  app(tr, ctxt('td', 'px-2 py-1.5 text-right font-mono ' + pctCls, hasQuota ? Math.round(projPct * 100) + '%' : '—'));
+  app(tr, ctxt('td', 'px-2 py-1.5 text-right font-mono text-slate-600', !hasQuota ? '—' : (gap > 0 ? fmt(gap) : '✓ hit')));
+  var statusTd = cel('td', 'px-2 py-1.5 text-center');
+  app(statusTd, ctxt('span', 'text-xs font-semibold px-2 py-0.5 rounded-full ' + badge[0], badge[1]));
+  app(tr, statusTd);
+  return tr;
+}
+
+function renderForecastTable(card, loadingNote, qtd, tQ, pace, mode, curQ, curDaysElapsed, lastSync) {
+  if (loadingNote && loadingNote.parentNode) loadingNote.parentNode.removeChild(loadingNote);
+  if (lastSync) app(card, ctxt('p', 'text-[11px] text-emerald-600 mb-2',
+    '✓ Reconciled to source · synced ' + lastSync.toLocaleString()));
+
+  var qKey = 'Q' + tQ;
+  var wrap = cel('div', 'overflow-x-auto');
+  var table = cel('table', 'w-full text-sm');
+  var thead = document.createElement('thead');
+  var htr = document.createElement('tr');
+  htr.className = 'text-slate-400 text-xs';
+  var cols = mode === 'projection'
+    ? [['Region','text-left'],['QTD Actual','text-right'],['Projected','text-right'],['% to Quota','text-right'],['Gap to 100%','text-right'],['Status','text-center']]
+    : [['Region','text-left'],['Final Actual','text-right'],['% to Quota','text-right'],['Gap to Quota','text-right'],['Status','text-center']];
+  cols.forEach(function(h){ app(htr, ctxt('th', h[1] + ' font-medium px-2 py-1.5', h[0])); });
+  thead.appendChild(htr); table.appendChild(thead);
+
+  var tbody = document.createElement('tbody');
+  var tot = { cw: 0, quota: 0, proj: 0 };
+  REGION_KEYS.forEach(function(rk) {
+    var cw = qtd[rk] || 0;
+    var quota = regionQuota(rk, qKey);
+    var proj = cw * pace;
+    tot.cw += cw; tot.quota += quota; tot.proj += proj;
+    tbody.appendChild(forecastRow(mode, REGION_LABELS[rk] || rk, cw, proj, quota, false));
+  });
+  tbody.appendChild(forecastRow(mode, 'Global', tot.cw, tot.proj, tot.quota, true));
+  table.appendChild(tbody); wrap.appendChild(table); app(card, wrap);
+
+  var note;
+  if (mode === 'final') {
+    note = 'Q' + tQ + ' is complete — showing final attainment. Q' + curQ + ' just started (day '
+         + curDaysElapsed + '); live pace-to-quota begins after ~2 weeks of the new quarter.';
+  } else {
+    note = 'Projection = quarter-to-date ÷ days elapsed × days in quarter.';
+    if (curDaysElapsed < 21) note += ' Still early in the quarter — treat the projection as directional.';
+  }
+  app(card, ctxt('p', 'text-[11px] text-slate-400 mt-2', note));
+}
+
 function buildAdminView() {
   var grid  = document.getElementById('adminGrid');
   var detail = document.getElementById('adminDetail');
@@ -2496,6 +2630,7 @@ function buildAdminView() {
         if (REGION_KEYS.some(function(rk) { return !regionQuotaCfg[rk]; })) {
           seedRegionQuotasFromProfiles(profiles);
         }
+        buildForecastBoard();   // RevOps pace-to-quota board (uses seeded quotas)
         while (grid.firstChild) grid.removeChild(grid.firstChild);
 
         REGION_KEYS.forEach(function(regionKey) {
