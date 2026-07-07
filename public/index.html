@@ -123,16 +123,24 @@
     <div id="obS1">
       <label class="block text-sm font-medium text-slate-700 mb-1">Your name</label>
       <input id="obName" type="text" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-      <label class="block text-sm font-medium text-slate-700 mb-1">Region</label>
-      <select id="obRegion" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-6 focus:outline-none focus:ring-2 focus:ring-blue-400">
-        <option value="">— Select —</option>
-        <option value="Global">Global — All Regions</option>
-        <option value="UK">UK (Simpro)</option>
-        <option value="BigChange">BigChange</option>
-        <option value="ANZ">ANZ</option>
-        <option value="US">US (Simpro)</option>
-        <option value="ClockShark">ClockShark</option>
-      </select>
+      <label class="block text-sm font-medium text-slate-700 mb-2">Regions you support (select one or more):</label>
+      <div id="obRegions" class="space-y-2 mb-6">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" class="obRegionCheckbox" value="UK" /> UK (Simpro)
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" class="obRegionCheckbox" value="BigChange" /> BigChange
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" class="obRegionCheckbox" value="ANZ" /> ANZ
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" class="obRegionCheckbox" value="US" /> US (Simpro)
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" class="obRegionCheckbox" value="ClockShark" /> ClockShark
+        </label>
+      </div>
       <button onclick="obNext(1)" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 transition-all">Next →</button>
     </div>
 
@@ -212,6 +220,7 @@
     </div>
     <!-- Hidden legacy IDs used by JS -->
     <span id="kpiOTE" class="hidden"></span>
+    <span id="kpiCommLabel" class="hidden"></span>
     <div class="flex-1"></div>
     <select id="viewAs" onchange="onViewAsChange()" class="hidden bg-slate-700 text-amber-300 text-xs px-2 py-1 rounded-lg border border-slate-600 focus:outline-none mr-1">
       <option value="admin">View: Global Admin</option>
@@ -419,6 +428,14 @@
           <div id="annualRow" class="mt-3 pt-3 border-t border-slate-100 text-xs"></div>
         </div>
 
+        <!-- Pay Calendar Reference (IC view only) -->
+        <div id="payCalCard" class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 hidden">
+          <h2 class="font-semibold text-slate-800 text-sm mb-1">Pay Calendar</h2>
+          <p class="text-[10px] text-slate-400 mb-3 leading-tight">What each month's paycheck is based on. Payments lag CW by one cycle.</p>
+          <div id="payCalGrid" class="grid grid-cols-3 gap-1.5"></div>
+          <p class="text-[10px] text-slate-400 mt-2 leading-tight">Deals closing in Mar, Jun, Sep, Dec get no draw — first paid in the following true-up.</p>
+        </div>
+
         <!-- Scenario Modeler (Global IC view only) -->
         <div id="scenarioCard" class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 hidden">
           <h2 class="font-semibold text-slate-800 text-sm mb-2">Scenario Modeler</h2>
@@ -512,6 +529,20 @@
     <h2 class="font-semibold text-slate-800 text-base mb-4">Individual SE Breakdown</h2>
     <div id="rptCards" class="space-y-4 mb-8"></div>
 
+    <!-- Commission History Report -->
+    <div id="commHistCard" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mt-6">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="font-semibold text-slate-800 text-sm">2026 Commission Breakdown</h2>
+        <select id="commHistSeSel" onchange="onCommHistSeFilter()"
+          class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus:outline-none">
+          <option value="ALL">All SEs</option>
+        </select>
+      </div>
+      <div id="commHistLoading" class="text-center py-8 text-slate-400 text-sm">Loading commission data…</div>
+      <div id="commHistSummary" class="hidden overflow-x-auto"></div>
+      <div id="commHistDetail" class="hidden"></div>
+    </div>
+
   </div>
 
   <!-- Toast -->
@@ -537,7 +568,7 @@ var fbAuth = firebase.auth();
 var db     = firebase.firestore();
 var lastHandledAuthUid = null;
 
-var ALLOWED_DOMAINS = ['simprogroup.com','simpro.us','simpro.au','simpro.nz','bigchange.com','clockshark.com'];
+var ALLOWED_DOMAINS = ['simprogroup.com','simpro.us','simpro.au','simpro.nz','bigchange.com','clockshark.com','simpro.co.uk'];
 
 function googleProvider() {
   return new firebase.auth.GoogleAuthProvider();
@@ -637,6 +668,22 @@ var MONTHS = {
   '2026-11': { label:'Nov 2026', start:'2026-11-01', end:'2026-11-30', days:30 },
   '2026-12': { label:'Dec 2026', start:'2026-12-01', end:'2026-12-31', days:31 }
 };
+
+// Pay calendar: what each month's paycheck is based on (lagged one cycle).
+var PAY_CALENDAR = [
+  { month:'2026-01', label:'JAN', type:'trueup', title:'Q4 True-up',  sub:'full Oct–Dec (prev yr)' },
+  { month:'2026-02', label:'FEB', type:'draw',   title:'Q1 · Draw 1', sub:'January CW' },
+  { month:'2026-03', label:'MAR', type:'draw',   title:'Q1 · Draw 2', sub:'Jan–Feb CW (QTD)' },
+  { month:'2026-04', label:'APR', type:'trueup', title:'Q1 True-up',  sub:'full Jan–Mar' },
+  { month:'2026-05', label:'MAY', type:'draw',   title:'Q2 · Draw 1', sub:'April CW' },
+  { month:'2026-06', label:'JUN', type:'draw',   title:'Q2 · Draw 2', sub:'Apr–May CW (QTD)' },
+  { month:'2026-07', label:'JUL', type:'trueup', title:'Q2 True-up',  sub:'full Apr–Jun' },
+  { month:'2026-08', label:'AUG', type:'draw',   title:'Q3 · Draw 1', sub:'July CW' },
+  { month:'2026-09', label:'SEP', type:'draw',   title:'Q3 · Draw 2', sub:'Jul–Aug CW (QTD)' },
+  { month:'2026-10', label:'OCT', type:'trueup', title:'Q3 True-up',  sub:'full Jul–Sep' },
+  { month:'2026-11', label:'NOV', type:'draw',   title:'Q4 · Draw 1', sub:'October CW' },
+  { month:'2026-12', label:'DEC', type:'draw',   title:'Q4 · Draw 2', sub:'Oct–Nov CW (QTD)' }
+];
 var MONTH_KEYS = Object.keys(MONTHS);
 
 var DEFAULT_UK_AES = [
@@ -661,6 +708,22 @@ var regionExpanded = {
 };
 var icMonthlyDataCache = {};
 
+// Get a profile's region(s) — handles both the current multi-region shape
+// (profile.regions array, written by onboarding) and legacy single-region
+// profiles (profile.region). Always returns a non-empty array of region keys.
+function regionsOf(p) {
+  if (!p) return ['UK'];
+  if (p.regions && Array.isArray(p.regions) && p.regions.length > 0) {
+    return p.regions;
+  }
+  return p.region ? [p.region] : ['UK'];
+}
+// Primary (first) region for a profile — the one used wherever a single
+// region key is needed (currency, default AE region, single-region lookups).
+function primaryRegionOf(p) { return regionsOf(p)[0]; }
+// Current signed-in SE's region(s).
+function getSERegions() { return regionsOf(profile); }
+
 function profileRegionName(region) {
   var map = {
     UK: 'Simpro UK',
@@ -683,7 +746,7 @@ function defaultPoolForProfile() {
 // truth, stored per region in regionPools/{regionKey}_{quarter}.
 var REGION_KEYS   = ['UK', 'BigChange', 'US', 'ANZ', 'ClockShark'];
 var REGION_LABELS = { UK:'Simpro UK', BigChange:'BigChange', US:'Simpro US', ANZ:'Simpro ANZ', ClockShark:'ClockShark' };
-var GLOBAL_REGIONS = ['UK', 'BigChange', 'US', 'ANZ', 'ClockShark'];   // Brad's comp: all regions
+var GLOBAL_REGIONS = ['UK', 'BigChange', 'ANZ'];   // Brad's comp plan: UK + ANZ + BigChange only
 
 // NZ folds into ANZ (BigQuery combines AU + NZ as "SimPro ANZ").
 function normRegion(r) { return r === 'NZ' ? 'ANZ' : (r || 'UK'); }
@@ -709,7 +772,10 @@ function dashSelection() {
     var match = (typeof SE_ROSTER !== 'undefined') && SE_ROSTER.filter(function(s){ return s.name === name; })[0];
     return match ? match.region : 'UK';
   }
-  return profile ? profile.region : 'UK';
+  // Regular SE: their own primary region. Onboarding stores profile.regions
+  // (array), so read through regionsOf() — profile.region (singular) is unset
+  // for everyone onboarded via the multi-region flow.
+  return primaryRegionOf(profile);
 }
 function dashIsAll() { return dashSelection() === 'ALL'; }
 
@@ -888,9 +954,14 @@ function fsSetRegionQuotas(regionKey, quotas) {
 function adminRosterProfiles(liveProfiles) {
   var profiles = (liveProfiles || []).slice();
   var seen = {};
+  // Register BOTH email and displayName: the roster is de-duped by name below,
+  // so a live profile must mark its name as seen or it gets a duplicate
+  // placeholder (live profiles are keyed by email; roster entries by name).
   profiles.forEach(function(p) {
-    var key = String(p.email || p.displayName || '').toLowerCase();
-    if (key) seen[key] = true;
+    [p.email, p.displayName].forEach(function(v) {
+      var key = String(v || '').toLowerCase();
+      if (key) seen[key] = true;
+    });
   });
   if (typeof SE_ROSTER === 'undefined') return profiles;
   SE_ROSTER.forEach(function(se, idx) {
@@ -911,21 +982,30 @@ function adminRosterProfiles(liveProfiles) {
   return profiles;
 }
 
+// Backfill region team quotas from the SEs' personal quotas. Only fills
+// regions MISSING from regionQuotaCfg — never overwrites an admin-set or
+// already-seeded region. Reads regionsOf() so new-flow profiles (regions[]
+// array, no singular region) contribute; updates regionQuotaCfg in place so
+// the current render reflects the seeded values immediately.
 function seedRegionQuotasFromProfiles(profiles) {
   var regionQuotas = {};
   REGION_KEYS.forEach(function(rk) { regionQuotas[rk] = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }; });
   (profiles || []).forEach(function(p) {
-    if (!p.region || isAdminEmail(p.email)) return;
-    var rk = normRegion(p.region);
-    if (rk && regionQuotas[rk]) {
-      ['Q1','Q2','Q3','Q4'].forEach(function(q) {
-        regionQuotas[rk][q] += (p.quotas && p.quotas[q]) || 0;
-      });
-    }
+    if (isAdminEmail(p.email)) return;
+    regionsOf(p).forEach(function(r) {
+      var rk = normRegion(r);
+      if (rk && regionQuotas[rk]) {
+        ['Q1','Q2','Q3','Q4'].forEach(function(q) {
+          regionQuotas[rk][q] += (p.quotas && p.quotas[q]) || 0;
+        });
+      }
+    });
   });
   var promises = [];
   REGION_KEYS.forEach(function(rk) {
+    if (regionQuotaCfg[rk]) return;   // already configured — don't overwrite
     if (regionQuotas[rk].Q1 || regionQuotas[rk].Q2 || regionQuotas[rk].Q3 || regionQuotas[rk].Q4) {
+      regionQuotaCfg[rk] = { quotas: regionQuotas[rk] };   // reflect in this render
       promises.push(fsSetRegionQuotas(rk, regionQuotas[rk]));
     }
   });
@@ -956,7 +1036,10 @@ function adminRegionMetrics(regionKey, q) {
   var poolUSD = rp ? (rp.totalCwUSD || 0) : 0;
   var att = quota > 0 ? roundUp2(poolUSD / quota) : 0;
   var ses = (adminProfilesCache || []).filter(function(p) {
-    return normRegion(p.region) === regionKey && !isAdminEmail(p.email);
+    // An SE belongs to this region if any of their region(s) match. Reads
+    // through regionsOf() so new-flow profiles (regions[] array, no singular
+    // region) and multi-region SEs are bucketed correctly.
+    return regionsOf(p).map(normRegion).indexOf(regionKey) !== -1 && !isAdminEmail(p.email);
   });
   var regionName = (rp && rp.regionName) ? rp.regionName : (REGION_LABELS[regionKey] || regionKey);
   return { regionKey: regionKey, regionName: regionName, quota: quota, poolUSD: poolUSD, att: att, aes: aes, ses: ses };
@@ -981,6 +1064,70 @@ function payout(cwUSD, quota, ote) {
   var att = roundUp2(cwUSD / quota);
   // Paid linearly from the first dollar (no floor), capped at 200% OTE.
   return { att: att, pay: Math.min(att, 2.0) * ote };
+}
+
+// Quarterly draw model per comp plan: Months 1 & 2 capped at 100%, Month 3 is true-up
+function quarterlyDrawForMonth(m, monthlyData) {
+  var mNum = parseInt(m.slice(5), 10);
+  var qNum = Math.ceil(mNum / 3);
+  var monthInQ = ((mNum - 1) % 3) + 1;  // 1, 2, or 3 within the quarter
+  var qQuota = (profile && profile.quotas && profile.quotas['Q' + qNum]) || 0;
+  var qOTE   = commMonthlyOTE() * 3;    // quarterly commission target
+  if (!qQuota || !qOTE) return { pay: 0, att: 0, isDraw: monthInQ < 3 };
+
+  var qMonthKeys = MONTH_KEYS.filter(function(mk) {
+    return Math.ceil(parseInt(mk.slice(5), 10) / 3) === qNum;
+  });
+  var m1CW = (monthlyData && monthlyData[qMonthKeys[0]]) || 0;
+  var m2CW = (monthlyData && monthlyData[qMonthKeys[1]]) || 0;
+  var m3CW = (monthlyData && monthlyData[qMonthKeys[2]]) || 0;
+
+  var m1Draw = Math.min(m1CW / (qQuota / 3), 1.0) * (qOTE / 3);
+
+  if (monthInQ === 1) {
+    return { pay: m1Draw, att: m1CW / (qQuota / 3), isDraw: true };
+  }
+
+  var qtd2   = m1CW + m2CW;
+  var m2Draw = Math.max(0, Math.min(qtd2 / (qQuota * 2 / 3), 1.0) * (qOTE * 2 / 3) - m1Draw);
+
+  if (monthInQ === 2) {
+    return { pay: m2Draw, att: qtd2 / (qQuota * 2 / 3), isDraw: true };
+  }
+
+  // Month 3: true-up to full quarterly commission
+  var qtd3     = m1CW + m2CW + m3CW;
+  var qAtt     = Math.min(qtd3 / qQuota, 2.0);
+  var totalQ   = qAtt * qOTE;
+  return { pay: Math.max(0, totalQ - m1Draw - m2Draw), att: qtd3 / qQuota, isDraw: false };
+}
+
+// Quarterly draw model for a specific SE with their own quotas and OTE.
+function quarterlyDrawForSE(m, regionMonthlyData, quotas, monthlyOTE) {
+  var mNum = parseInt(m.slice(5), 10);
+  var qNum = Math.ceil(mNum / 3);
+  var monthInQ = ((mNum - 1) % 3) + 1;
+  var qQuota = (quotas && quotas['Q' + qNum]) || 0;
+  var qOTE = monthlyOTE * 3;
+  if (!qQuota || !qOTE) return { pay: 0, att: 0, isDraw: monthInQ < 3 };
+
+  var qMonthKeys = MONTH_KEYS.filter(function(mk) {
+    return Math.ceil(parseInt(mk.slice(5), 10) / 3) === qNum;
+  });
+  var m1CW = (regionMonthlyData && regionMonthlyData[qMonthKeys[0]]) || 0;
+  var m2CW = (regionMonthlyData && regionMonthlyData[qMonthKeys[1]]) || 0;
+  var m3CW = (regionMonthlyData && regionMonthlyData[qMonthKeys[2]]) || 0;
+
+  var m1Draw = Math.min(m1CW / (qQuota / 3), 1.0) * (qOTE / 3);
+  if (monthInQ === 1) return { pay: m1Draw, att: m1CW / (qQuota / 3), isDraw: true };
+
+  var qtd2 = m1CW + m2CW;
+  var m2Draw = Math.max(0, Math.min(qtd2 / (qQuota * 2 / 3), 1.0) * (qOTE * 2 / 3) - m1Draw);
+  if (monthInQ === 2) return { pay: m2Draw, att: qtd2 / (qQuota * 2 / 3), isDraw: true };
+
+  var qtd3 = m1CW + m2CW + m3CW;
+  var qAtt = Math.min(qtd3 / qQuota, 2.0);
+  return { pay: Math.max(0, qAtt * qOTE - m1Draw - m2Draw), att: qtd3 / qQuota, isDraw: false };
 }
 
 function attColor(a) {
@@ -1065,15 +1212,17 @@ function doSignOut() {
 // ── ONBOARDING ─────────────────────────────────────────
 function obNext(step) {
   if (step === 1) {
-    if (!document.getElementById('obName').value.trim() || !document.getElementById('obRegion').value) {
-      alert('Please fill in all fields.'); return;
+    var regionCheckboxes = document.querySelectorAll('.obRegionCheckbox:checked');
+    var regions = Array.from(regionCheckboxes).map(el => el.value);
+    if (!document.getElementById('obName').value.trim() || regions.length === 0) {
+      alert('Please fill in your name and select at least one region.'); return;
     }
-    var region = document.getElementById('obRegion').value;
+    var primaryRegion = regions[0];
     var symMap = { UK:'£', BigChange:'£', ANZ:'A$', US:'$', ClockShark:'$', Global:'$' };
-    var sym = symMap[region] || '$';
+    var sym = symMap[primaryRegion] || '$';
     document.getElementById('obSym').textContent = sym;
     document.getElementById('obSym2').textContent = sym;
-    if (region === 'UK' || region === 'BigChange') {
+    if (primaryRegion === 'UK' || primaryRegion === 'BigChange') {
       document.getElementById('obQ1').value = 175008;
       document.getElementById('obQ2').value = 226150;
       document.getElementById('obQ3').value = 288083;
@@ -1103,12 +1252,19 @@ function obBack() {
 }
 
 function obFinish() {
-  var region   = document.getElementById('obRegion').value;
+  var regionCheckboxes = document.querySelectorAll('.obRegionCheckbox:checked');
+  var regions = Array.from(regionCheckboxes).map(el => el.value);
+  if (regions.length === 0) {
+    alert('Please select at least one region');
+    return;
+  }
+
   var annual   = parseFloat(document.getElementById('obOTE').value) || 0;
   var fxMap    = { UK:1.34, BigChange:1.34, ANZ:0.647, US:1.0, ClockShark:1.0, Global:1.0 };
   var symMap   = { UK:'£', BigChange:'£', ANZ:'A$', US:'$', ClockShark:'$', Global:'$' };
-  var fx = fxMap[region] || 1.0;
-  var sym = symMap[region] || '$';
+  var primaryRegion = regions[0];  // Use first selected region for currency/FX
+  var fx = fxMap[primaryRegion] || 1.0;
+  var sym = symMap[primaryRegion] || '$';
   var q1 = parseFloat(document.getElementById('obQ1').value) || 0;
   var q2 = parseFloat(document.getElementById('obQ2').value) || 0;
   var q3 = parseFloat(document.getElementById('obQ3').value) || 0;
@@ -1117,7 +1273,7 @@ function obFinish() {
     uid: currentUser.uid,
     email: currentUser.email,
     displayName: document.getElementById('obName').value.trim(),
-    region: region,
+    regions: regions,
     currency: sym,
     fx: fx,
     annualOTE: annual,
@@ -1189,13 +1345,30 @@ function loadPool(callback) {
         callback();
       });
     } else {
-      var regionKey = normRegion(dashSelection());
-      fsGetRegionPool(regionKey, q, function(rp) {
-        regionPoolMeta = rp;
-        pool = mapAes(rp, profileRegionName(regionKey));
-        regionExpanded[profileRegionName(regionKey)] = true;
-        callback();
-      });
+      // Single SE view (may be multi-region)
+      var seRegions = getSERegions();
+      if (seRegions.length === 1) {
+        // Single region SE
+        var regionKey = normRegion(seRegions[0]);
+        fsGetRegionPool(regionKey, q, function(rp) {
+          regionPoolMeta = rp;
+          pool = mapAes(rp, profileRegionName(regionKey));
+          regionExpanded[profileRegionName(regionKey)] = true;
+          callback();
+        });
+      } else {
+        // Multi-region SE — load and combine all regions
+        fsGetRegionPoolsForQuarter(q, function(pools) {
+          regionPoolMeta = null;
+          pool = [];
+          seRegions.forEach(function(rk) {
+            var rp = pools[rk];
+            if (rp) pool = pool.concat(mapAes(rp, profileRegionName(rk)));
+            regionExpanded[profileRegionName(rk)] = true;
+          });
+          callback();
+        });
+      }
     }
   });
 }
@@ -1320,7 +1493,7 @@ function buildDashboard() {
 
   // IC analytics widgets (shown for all SE views, hidden on All-regions admin view)
   var showIcCharts = !isAll;
-  ['monthlyAttCard','monthlyCommCard','quarterlyCard','scenarioCard'].forEach(function(id) {
+  ['monthlyAttCard','monthlyCommCard','quarterlyCard','scenarioCard','payCalCard'].forEach(function(id) {
     var el2 = document.getElementById(id);
     if (el2) el2.classList.toggle('hidden', !showIcCharts);
   });
@@ -1347,18 +1520,30 @@ function loadIcMonthlyData(callback) {
   if (icMonthlyDataCache[sel]) { callback(icMonthlyDataCache[sel]); return; }
   var elapsed = ELAPSED_MONTHS;
   if (!elapsed || !elapsed.length) { icMonthlyDataCache[sel] = {}; callback({}); return; }
+
+  // Region keys whose Closed Won feeds this view. A regular SE sees the
+  // combined total of every region they support (matching how the AE pool is
+  // loaded in loadPool); admins/leaders see the selected region or the
+  // Global/ALL roll-ups.
+  var regionKeys;
+  if (sel === 'ALL') {
+    regionKeys = REGION_KEYS.slice();
+  } else if (sel === 'Global') {
+    regionKeys = GLOBAL_REGIONS.slice();
+  } else if (isICView() && !currentUserIsAdmin()) {
+    regionKeys = getSERegions().map(normRegion);
+  } else {
+    regionKeys = [normRegion(sel)];
+  }
+
   var result = {};
   var pending = elapsed.length;
   elapsed.forEach(function(m) {
     result[m] = 0;
     fsGetRegionPoolsForQuarter(m, function(pools) {
-      if (sel === 'Global') {
-        GLOBAL_REGIONS.forEach(function(rk) {
-          if (pools[rk]) result[m] += pools[rk].totalCwUSD || 0;
-        });
-      } else {
-        if (pools[sel]) result[m] = pools[sel].totalCwUSD || 0;
-      }
+      regionKeys.forEach(function(rk) {
+        if (pools[rk]) result[m] += pools[rk].totalCwUSD || 0;
+      });
       if (--pending === 0) { icMonthlyDataCache[sel] = result; callback(icMonthlyDataCache[sel]); }
     });
   });
@@ -1459,7 +1644,9 @@ function buildMonthlyAttChart(data) {
               var cw = ctx.parsed.y;
               var att = quota > 0 ? (cw / quota * 100).toFixed(1) : '—';
               var oteV = commMonthlyOTE();
-              var comm = quota > 0 ? payout(cw, quota, oteV).pay : 0;
+              var monthlyData = icMonthlyDataCache[dashSelection()];
+              var drawR = monthlyData ? quarterlyDrawForMonth(m, monthlyData) : { pay: 0, isDraw: false };
+              var comm = drawR.pay;
               return [
                 'CW: $' + Math.round(cw).toLocaleString(),
                 'Attainment: ' + att + '%',
@@ -1498,7 +1685,8 @@ function buildMonthlyCommChart(data) {
     var cw = data[m] || 0;
     var quota = profileMonthlyQuota(m);
     var att = quota > 0 ? cw / quota : 0;
-    var comm = quota > 0 ? payout(cw, quota, ote).pay : 0;
+    var drawR = quarterlyDrawForMonth(m, data);
+    var comm = drawR.pay;
     var isFuture = !data.hasOwnProperty(m);
     commData.push(isFuture ? 0 : comm);
     oteLineData.push(ote);
@@ -1599,12 +1787,16 @@ function buildQuarterlySummary(data) {
     qMonths.forEach(function(m) {
       if (data.hasOwnProperty(m)) {
         hasElapsed = true;
-        var mCW = data[m] || 0;
-        qCW += mCW;
-        qComm += payout(mCW, profileMonthlyQuota(m), ote).pay;
+        qCW += data[m] || 0;
       }
     });
-    if (hasElapsed) { ytdCW += qCW; ytdQuota += qQuota; ytdComm += qComm; }
+    if (hasElapsed && qQuota > 0) {
+      var qOTE = ote * 3;
+      qComm = Math.min(qCW / qQuota, 2.0) * qOTE;
+      ytdCW += qCW;
+      ytdQuota += qQuota;
+      ytdComm += qComm;
+    }
     var isCurrentQ = qNum === curQ;
     var row = document.createElement('div');
     row.className = 'rounded-lg px-2 py-1.5' + (isCurrentQ ? ' bg-blue-50' : '');
@@ -1836,7 +2028,7 @@ function buildAETable(sym) {
 }
 
 function addAE() {
-  var aeRegion = profileRegionName(profile ? profile.region : 'UK');
+  var aeRegion = profileRegionName(primaryRegionOf(profile));
   regionExpanded[aeRegion] = true;
   pool.push({ id:'ae_'+Date.now(), name:'New AE', type:'Territory', target:0, cw:0, status:'active', aeRegion:aeRegion });
   buildAETable();
@@ -2021,7 +2213,12 @@ function recalc() {
   var poolUSD = totClosed * fx;
   var res = payout(poolUSD, quota, ote);
   var att = res.att;
-  var pay = res.pay;
+  var monthlyData = icMonthlyDataCache[dashSelection()];
+  var drawRes = (!dashIsAll() && monthlyData && Object.keys(monthlyData).length)
+    ? quarterlyDrawForMonth(q, monthlyData)
+    : res;
+  var pay = drawRes.pay;
+  var isDraw = drawRes.isDraw;
   var attPct = (att * 100).toFixed(2);
 
   // KPIs
@@ -2033,6 +2230,10 @@ function recalc() {
   // Commission $ is per-SE; not meaningful on the global "All Regions" rollup.
   document.getElementById('kpiComm').textContent = dashIsAll() ? '—' : fmt(pay);
   document.getElementById('kpiOTE').textContent = dashIsAll() ? '—' : fmt(ote);
+  var commLabel = document.getElementById('kpiCommLabel');
+  if (commLabel && !dashIsAll()) {
+    commLabel.textContent = isDraw ? 'Est. Draw (capped 100%)' : 'Quarter True-up';
+  }
 
   var badges = att >= 2   ? ['bg-purple-100 text-purple-700', '200%+ Cap 🚀']
              : att >= 1   ? ['bg-green-100 text-green-700',   'Quota Hit ✓']
@@ -2074,6 +2275,9 @@ function recalc() {
     buildEarnedCommCard(poolUSD, quota, ote, daysElapsed, daysInMonth);
     buildGapToQuotaCard(poolUSD, quota, ote);
   }
+
+  // Update pay calendar card for the current month
+  buildPayCalCard(q);
 }
 
 function buildThresh(quota, ote, poolUSD, fx, sym) {
@@ -2099,6 +2303,38 @@ function buildThresh(quota, ote, poolUSD, fx, sym) {
       + '</div></div>';
   });
   document.getElementById('threshCards').innerHTML = html;
+}
+
+function buildPayCalCard(curMonth) {
+  var grid = document.getElementById('payCalGrid');
+  if (!grid) return;
+  while (grid.firstChild) grid.removeChild(grid.firstChild);
+
+  var selMonth = document.getElementById('qSel').value;
+  PAY_CALENDAR.forEach(function(entry) {
+    var isCur    = entry.month === curMonth;
+    var isPast   = entry.month < selMonth;
+    var isTrueup = entry.type === 'trueup';
+
+    var tileClass = 'rounded-lg p-1.5 border text-center transition-all ' +
+      (isTrueup ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200') +
+      (isCur ? ' ring-2 ring-blue-500 ring-offset-1' : '') +
+      (isPast && !isCur ? ' opacity-60' : '');
+
+    var tile = cel('div', tileClass);
+
+    var monthLabel = ctxt('div',
+      'text-[10px] font-bold mb-0.5 ' + (isCur ? 'text-blue-600' : isTrueup ? 'text-blue-500' : 'text-slate-600'),
+      entry.label
+    );
+    var titleLabel = ctxt('div', 'text-[9px] font-semibold leading-tight ' + (isTrueup ? 'text-blue-700' : 'text-slate-700'), entry.title);
+    var subLabel = ctxt('div', 'text-[8px] text-slate-400 mt-0.5 leading-tight', entry.sub);
+
+    tile.appendChild(monthLabel);
+    tile.appendChild(titleLabel);
+    tile.appendChild(subLabel);
+    grid.appendChild(tile);
+  });
 }
 
 function updateDays() {
@@ -2222,7 +2458,11 @@ function buildAdminView() {
       adminRegionPoolsCache = regionPools || {};
       fsGetAllProfiles(function(profiles) {
         adminProfilesCache = adminRosterProfiles(profiles);
-        if (Object.keys(regionQuotaCfg).length === 0) {
+        // Backfill any region that has SEs but no quota yet (self-limits to
+        // missing regions). Fixes regions onboarded after the first seed —
+        // previously only ran when regionConfig was entirely empty, so e.g.
+        // UK never got a quota once BigChange existed.
+        if (REGION_KEYS.some(function(rk) { return !regionQuotaCfg[rk]; })) {
           seedRegionQuotasFromProfiles(profiles);
         }
         while (grid.firstChild) grid.removeChild(grid.firstChild);
@@ -2396,7 +2636,9 @@ function buildEarnedCommCard(currentCW, currentQuota, ote, daysElapsed, daysInMo
   var quotaEl = document.getElementById('quotaComm');
   if (!earnEl) return;
 
-  var earnedRes = payout(currentCW, currentQuota, ote);
+  var q = document.getElementById('qSel').value;
+  var monthlyData = icMonthlyDataCache[dashSelection()];
+  var earnedRes = monthlyData ? quarterlyDrawForMonth(q, monthlyData) : payout(currentCW, currentQuota, ote);
   var earnedComm = earnedRes.pay;
   var projectedCW = daysInMonth > 0 && daysElapsed > 0 ? currentCW * (daysInMonth / daysElapsed) : currentCW;
   var projectedRes = payout(projectedCW, currentQuota, ote);
@@ -2494,6 +2736,8 @@ var RPT_SE_LIST = SE_ROSTER.filter(function(s){ return s.region !== 'Global'; })
 
 // Cache of loaded pool docs keyed by '{regionKey}_{YYYY-MM}'.
 var rptPoolData = {};
+var commHistPoolsCache = null;      // regionKey -> { 'YYYY-MM': totalCwUSD, ... }
+var commHistProfilesCache = null;   // merged profiles + roster data for all SEs
 
 function loadRptPools(cb) {
   var keys = [];
@@ -2508,6 +2752,37 @@ function loadRptPools(cb) {
       .then(function(snap) { if (snap.exists) rptPoolData[key] = snap.data(); })
       .catch(function(){})
       .then(function() { if (--pending === 0 && cb) cb(); });
+  });
+}
+
+function loadCommHistData(cb) {
+  // Load all regionPools docs for all elapsed months across all regions
+  var keys = [];
+  REGION_KEYS.forEach(function(rk) {
+    ELAPSED_MONTHS.forEach(function(m) { keys.push(rk + '_' + m); });
+  });
+  commHistPoolsCache = {};
+  var pending = keys.length + 1;  // +1 for profiles load
+
+  if (!keys.length) {
+    fsGetAllProfiles(function(profiles) {
+      commHistProfilesCache = adminRosterProfiles(profiles);
+      if (--pending === 0 && cb) cb();
+    });
+    return;
+  }
+
+  keys.forEach(function(key) {
+    db.collection('regionPools').doc(key).get()
+      .then(function(snap) { if (snap.exists) commHistPoolsCache[key] = snap.data(); })
+      .catch(function(){})
+      .then(function() { if (--pending === 0 && cb) cb(); });
+  });
+
+  // Also load all profiles in parallel
+  fsGetAllProfiles(function(profiles) {
+    commHistProfilesCache = adminRosterProfiles(profiles);
+    if (--pending === 0 && cb) cb();
   });
 }
 
@@ -2611,6 +2886,19 @@ function buildReportTab() {
 
     buildReportChart();
     rebuildRptList(RPT_SE_LIST);
+
+    // ── Load commission history data and populate dropdown
+    loadCommHistData(function() {
+      var sel = document.getElementById('commHistSeSel');
+      while (sel.options.length > 1) sel.remove(1);
+      RPT_SE_LIST.forEach(function(se) {
+        var opt = document.createElement('option');
+        opt.value = se.name;
+        opt.textContent = se.name;
+        sel.appendChild(opt);
+      });
+      buildCommHistReport('ALL');
+    });
   });
 }
 
@@ -2669,6 +2957,218 @@ function rebuildRptList(seList) {
 }
 
 var rptFilter = '';
+var commHistFilter = '';
+
+function buildCommHistReport(seFilter) {
+  var summaryEl = document.getElementById('commHistSummary');
+  var detailEl = document.getElementById('commHistDetail');
+  var loadingEl = document.getElementById('commHistLoading');
+
+  if (!commHistPoolsCache || !commHistProfilesCache) {
+    summaryEl.classList.add('hidden');
+    detailEl.classList.add('hidden');
+    loadingEl.classList.remove('hidden');
+    return;
+  }
+
+  loadingEl.classList.add('hidden');
+
+  if (seFilter === 'ALL') {
+    summaryEl.classList.remove('hidden');
+    detailEl.classList.add('hidden');
+    buildCommHistSummaryTable(summaryEl);
+  } else {
+    summaryEl.classList.add('hidden');
+    detailEl.classList.remove('hidden');
+    buildCommHistDetailCard(detailEl, seFilter);
+  }
+}
+
+function buildCommHistSummaryTable(container) {
+  while (container.firstChild) container.removeChild(container.firstChild);
+
+  var table = cel('table', 'w-full text-sm border-collapse');
+  var thead = document.createElement('thead');
+  thead.className = 'bg-slate-50 border-b border-slate-200';
+  thead.innerHTML = '<tr>'
+    + '<th class="px-3 py-2 text-left font-medium text-slate-600">SE</th>'
+    + '<th class="px-3 py-2 text-center font-medium text-slate-600">Region</th>'
+    + '<th class="px-3 py-2 text-right font-medium text-slate-600">Q1</th>'
+    + '<th class="px-3 py-2 text-right font-medium text-slate-600">Q2</th>'
+    + '<th class="px-3 py-2 text-right font-medium text-slate-600">Q3</th>'
+    + '<th class="px-3 py-2 text-right font-medium text-slate-600">Q4</th>'
+    + '<th class="px-3 py-2 text-right font-medium text-slate-600">Annual</th>'
+    + '</tr>';
+  table.appendChild(thead);
+
+  var tbody = document.createElement('tbody');
+  RPT_SE_LIST.forEach(function(se, idx) {
+    var profile = commHistProfilesCache.find(function(p){ return (p.displayName || p.name) === se.name; });
+    if (!profile) return;  // skip if not in roster
+
+    var hasOTE = profile.annualOTE || profile.monthlyOTE;
+    var monthlyOTE = profile.monthlyOTE || (profile.annualOTE ? profile.annualOTE * 0.30 / 12 : 0);
+
+    var row = document.createElement('tr');
+    row.className = 'border-t border-slate-100' + (idx % 2 === 1 ? ' bg-slate-50' : '');
+
+    var qComms = [0, 0, 0, 0];
+    var annualComm = 0;
+    for (var q = 1; q <= 4; q++) {
+      var qNum = Math.ceil(ELAPSED_MONTHS.length / 12 * q);  // rough quarter position
+      var qMonths = MONTH_KEYS.filter(function(m){ return Math.ceil(parseInt(m.slice(5), 10) / 3) === q; });
+      var qElapsed = qMonths.filter(function(m){ return ELAPSED_MONTHS.indexOf(m) >= 0; });
+      if (qElapsed.length === 0) continue;  // no data for this quarter
+
+      if (!hasOTE) {
+        qComms[q - 1] = 0;
+      } else {
+        var regionData = buildMonthlyDataForSE(se.region);
+        var qComm = 0;
+        qElapsed.forEach(function(m) {
+          var draw = quarterlyDrawForSE(m, regionData, profile.quotas, monthlyOTE);
+          qComm += draw.pay;
+        });
+        qComms[q - 1] = qComm;
+        annualComm += qComm;
+      }
+    }
+
+    var nameCell = ctxt('td', 'px-3 py-2 font-medium text-slate-700', se.name);
+    var regionCell = ctxt('td', 'px-3 py-2 text-center text-slate-600', se.region);
+    var q1Cell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs ' + (hasOTE ? 'text-slate-700' : 'text-slate-400'), hasOTE ? fmt(qComms[0]) : '—');
+    var q2Cell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs ' + (hasOTE ? 'text-slate-700' : 'text-slate-400'), hasOTE ? fmt(qComms[1]) : '—');
+    var q3Cell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs ' + (hasOTE ? 'text-slate-700' : 'text-slate-400'), hasOTE ? fmt(qComms[2]) : '—');
+    var q4Cell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs ' + (hasOTE ? 'text-slate-700' : 'text-slate-400'), hasOTE ? fmt(qComms[3]) : '—');
+    var annualCell = ctxt('td', 'px-3 py-2 text-right font-mono font-semibold text-xs ' + (hasOTE ? 'text-slate-800' : 'text-slate-400'), hasOTE ? fmt(annualComm) : '—');
+
+    row.appendChild(nameCell);
+    row.appendChild(regionCell);
+    row.appendChild(q1Cell);
+    row.appendChild(q2Cell);
+    row.appendChild(q3Cell);
+    row.appendChild(q4Cell);
+    row.appendChild(annualCell);
+    tbody.appendChild(row);
+  });
+
+  table.appendChild(tbody);
+  container.appendChild(table);
+}
+
+function buildMonthlyDataForSE(seRegion) {
+  var data = {};
+  if (!commHistPoolsCache) return data;
+  ELAPSED_MONTHS.forEach(function(m) {
+    var key = seRegion + '_' + m;
+    var pool = commHistPoolsCache[key];
+    if (pool) data[m] = pool.totalCwUSD || 0;
+  });
+  return data;
+}
+
+function buildCommHistDetailCard(container, seName) {
+  while (container.firstChild) container.removeChild(container.firstChild);
+
+  var profile = commHistProfilesCache.find(function(p){ return (p.displayName || p.name) === seName; });
+  if (!profile || !profile.annualOTE) {
+    var msg = ctxt('div', 'text-slate-500 text-sm py-4', seName + ' — no OTE or quotas set');
+    container.appendChild(msg);
+    return;
+  }
+
+  var monthlyOTE = profile.monthlyOTE || (profile.annualOTE * 0.30 / 12);
+  var regionData = buildMonthlyDataForSE(primaryRegionOf(profile));
+
+  var table = cel('table', 'w-full text-sm border-collapse');
+  var thead = document.createElement('thead');
+  thead.className = 'bg-slate-50 border-b border-slate-200';
+  thead.innerHTML = '<tr>'
+    + '<th class="px-3 py-2 text-left font-medium text-slate-600">Month</th>'
+    + '<th class="px-3 py-2 text-center font-medium text-slate-600">Type</th>'
+    + '<th class="px-3 py-2 text-right font-medium text-slate-600">Commission</th>'
+    + '<th class="px-3 py-2 text-right font-medium text-slate-600">Region CW</th>'
+    + '<th class="px-3 py-2 text-right font-medium text-slate-600">Attainment</th>'
+    + '</tr>';
+  table.appendChild(thead);
+
+  var tbody = document.createElement('tbody');
+  var qTotals = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  var lastQ = 0;
+
+  ELAPSED_MONTHS.forEach(function(m, mIdx) {
+    var mNum = parseInt(m.slice(5), 10);
+    var qNum = Math.ceil(mNum / 3);
+    var cw = regionData[m] || 0;
+
+    var draw = quarterlyDrawForSE(m, regionData, profile.quotas, monthlyOTE);
+    qTotals[qNum] += draw.pay;
+
+    // Show quarter header row before first month of new quarter
+    if (qNum !== lastQ && lastQ > 0) {
+      var qtRow = document.createElement('tr');
+      qtRow.className = 'bg-blue-50 border-t-2 border-slate-200';
+      var qtLabel = ctxt('td', 'px-3 py-2.5 font-semibold text-slate-800', 'Q' + lastQ + ' Total');
+      var qtTypeCell = cel('td', '');
+      var qtCommCell = ctxt('td', 'px-3 py-2.5 text-right font-mono font-semibold text-blue-700', fmt(qTotals[lastQ]));
+      var qtCwCell = cel('td', '');
+      var qtAttCell = cel('td', '');
+      qtRow.appendChild(qtLabel);
+      qtRow.appendChild(qtTypeCell);
+      qtRow.appendChild(qtCommCell);
+      qtRow.appendChild(qtCwCell);
+      qtRow.appendChild(qtAttCell);
+      tbody.appendChild(qtRow);
+    }
+    lastQ = qNum;
+
+    var row = document.createElement('tr');
+    row.className = 'border-t border-slate-100';
+
+    var monthLabel = MONTHS[m].label.slice(0, 3) + ' ' + m.slice(0, 4);
+    var typeLabel = draw.isDraw ? 'Est. Draw' : 'True-up';
+    var typeBg = draw.isDraw ? 'bg-amber-50' : 'bg-green-50';
+    var typeColor = draw.isDraw ? 'text-amber-700' : 'text-green-700';
+
+    var mCell = ctxt('td', 'px-3 py-2 font-medium text-slate-700', monthLabel);
+    var typeCell = ctxt('td', 'px-3 py-2 text-center text-xs font-semibold px-2 py-1 rounded ' + typeBg + ' ' + typeColor, typeLabel);
+    var commCell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs font-semibold text-slate-800', fmt(draw.pay));
+    var cwCell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-600', fmt(cw));
+    var attCell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-600', (draw.att * 100).toFixed(1) + '%');
+
+    row.appendChild(mCell);
+    row.appendChild(typeCell);
+    row.appendChild(commCell);
+    row.appendChild(cwCell);
+    row.appendChild(attCell);
+    tbody.appendChild(row);
+  });
+
+  // Final quarter total
+  if (lastQ > 0) {
+    var qtRow = document.createElement('tr');
+    qtRow.className = 'bg-blue-50 border-t-2 border-slate-200';
+    var qtLabel = ctxt('td', 'px-3 py-2.5 font-semibold text-slate-800', 'Q' + lastQ + ' Total');
+    var qtTypeCell = cel('td', '');
+    var qtCommCell = ctxt('td', 'px-3 py-2.5 text-right font-mono font-semibold text-blue-700', fmt(qTotals[lastQ]));
+    var qtCwCell = cel('td', '');
+    var qtAttCell = cel('td', '');
+    qtRow.appendChild(qtLabel);
+    qtRow.appendChild(qtTypeCell);
+    qtRow.appendChild(qtCommCell);
+    qtRow.appendChild(qtCwCell);
+    qtRow.appendChild(qtAttCell);
+    tbody.appendChild(qtRow);
+  }
+
+  table.appendChild(tbody);
+  container.appendChild(table);
+}
+
+function onCommHistSeFilter() {
+  commHistFilter = document.getElementById('commHistSeSel').value;
+  buildCommHistReport(commHistFilter);
+}
 
 function onRptFilter() {
   rptFilter = document.getElementById('rptFilterSel').value;
