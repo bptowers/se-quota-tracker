@@ -2705,24 +2705,27 @@ var rptChartInst = null;
 
 // Real global SE roster (region = app region code; brand+geo mapped). Used by
 // the Team View region drill-down. OTE omitted until provided (commission shows "—").
+// Order and membership mirror docs/se_team_assignments.xlsx. Titles/managers
+// carried over from prior data; new entries default to Sales Engineer/Brad.
 var SE_ROSTER = [
-  { name:'Brad Towers',      region:'Global',     title:'Senior Director, Sales Engineering',     manager:'Pete Mansel' },
-  { name:'Austin Huddleson', region:'US',         title:'Sales Engineer, Technology Integration', manager:'Brad Towers' },
-  { name:'Carter Jones',     region:'US',         title:'Senior Sales Engineer',                  manager:'Brad Towers' },
-  { name:'Joseph Valdez',    region:'US',         title:'Sales Engineer',                         manager:'Brad Towers' },
-  { name:'Sarah Sareh',      region:'US',         title:'Senior Sales Engineer',                  manager:'Brad Towers' },
-  { name:'Isabelle Schicht', region:'ClockShark', title:'Associate Sales Engineer',               manager:'Brad Towers' },
-  { name:'Ray Robinson',     region:'ClockShark', title:'Associate Sales Engineer',               manager:'Brad Towers' },
-  { name:'Adam Skinner',     region:'UK',         title:'Sales Engineer',                         manager:'Brad Towers' },
-  { name:'Jason Passey',     region:'UK',         title:'Sales Engineer',                         manager:'Brad Towers' },
-  { name:'Dave Shaw',        region:'BigChange',  title:'Sales Engineer',                         manager:'Brad Towers' },
-  { name:'Lee Wilkinson',    region:'BigChange',  title:'Principal Sales Engineer',               manager:'Brad Towers' },
-  { name:'Matthew Beecham',  region:'BigChange',  title:'Associate Sales Engineer',               manager:'Brad Towers' },
-  { name:'Danielle Berson',  region:'BigChange',  title:'Pre-Sales Manager',                      manager:'Brad Towers' },
-  { name:'Roger Quinn',      region:'BigChange',  title:'Sales Engineer',                         manager:'Brad Towers' },
-  { name:'Shane Rhodes',     region:'ANZ',        title:'Senior Sales Engineer',                  manager:'Brad Towers' },
-  { name:'Dylan Rhodes',     region:'ANZ',        title:'Sales Engineer',                         manager:'Brad Towers' },
-  { name:'TBH (open role)',  region:'ANZ',        title:'Sales Engineer',                         manager:'Brad Towers' }
+  { name:'Brad Towers',        region:'Global',     title:'Senior Director, Sales Engineering',     manager:'Pete Mansel' },
+  { name:'Austin Huddleson',   region:'US',         title:'Sales Engineer, Technology Integration', manager:'Brad Towers' },
+  { name:'Jack Conley',        region:'US',         title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'Tom',                region:'US',         title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'TBH (Joe Backfill)', region:'US',         title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'Sarah Sareh',        region:'US',         title:'Senior Sales Engineer',                  manager:'Brad Towers' },
+  { name:'Adam Skinner',       region:'UK',         title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'Jason Passey',       region:'UK',         title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'Dave Shaw',          region:'BigChange',  title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'Lee Wilkinson',      region:'BigChange',  title:'Principal Sales Engineer',               manager:'Brad Towers' },
+  { name:'Matthew Beecham',    region:'BigChange',  title:'Associate Sales Engineer',               manager:'Brad Towers' },
+  { name:'Danielle Berson',    region:'BigChange',  title:'Pre-Sales Manager',                      manager:'Brad Towers' },
+  { name:'Roger Quinn',        region:'BigChange',  title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'Shane Rhodes',       region:'ANZ',        title:'Senior Sales Engineer',                  manager:'Brad Towers' },
+  { name:'Dylan Rhodes',       region:'ANZ',        title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'TBH (Rod Backfill)', region:'ANZ',        title:'Sales Engineer',                         manager:'Brad Towers' },
+  { name:'Isabelle Schicht',   region:'ClockShark', title:'Associate Sales Engineer',               manager:'Brad Towers' },
+  { name:'Ray Robinson',       region:'ClockShark', title:'Associate Sales Engineer',               manager:'Brad Towers' }
 ];
 
 // ── Report tab: real live data from Firestore regionPools ──
