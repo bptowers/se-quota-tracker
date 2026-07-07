@@ -257,6 +257,14 @@
     <button onclick="doSignOut()" class="text-xs text-slate-400 hover:text-white ml-2">Sign out</button>
   </nav>
 
+  <!-- Global disclaimer — shown above every tab -->
+  <div class="bg-amber-50 border-b border-amber-200 px-4 py-2">
+    <p class="text-xs text-amber-800 text-center max-w-5xl mx-auto leading-snug">
+      <span class="font-semibold">Quotas are issued in USD and converted to local currency by the company.</span>
+      Results shown are estimates only — actual payments may vary.
+    </p>
+  </div>
+
   <!-- SE Dashboard -->
   <div id="tabSE" class="px-4 py-4">
     <div class="flex gap-4 items-start">
@@ -296,6 +304,22 @@
         <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
           <h2 class="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-3">Monthly Quotas (2026)</h2>
           <div id="quotaRef" class="text-xs space-y-1"></div>
+        </div>
+
+        <!-- Getting Paid -->
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+          <h2 class="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-1">💳 Getting Paid</h2>
+          <p class="text-[10px] text-slate-400 uppercase tracking-wide mb-2.5">Payment Schedule</p>
+          <div class="text-xs space-y-2.5">
+            <div>
+              <div class="font-medium text-slate-700">ANZ</div>
+              <div class="text-slate-500">+45 days after month-end</div>
+            </div>
+            <div>
+              <div class="font-medium text-slate-700">UK, US &amp; BigChange</div>
+              <div class="text-slate-500">+30 days after month-end</div>
+            </div>
+          </div>
         </div>
       </div>
 
