@@ -1227,6 +1227,12 @@ function obNext(step) {
       document.getElementById('obQ2').value = 226150;
       document.getElementById('obQ3').value = 288083;
       document.getElementById('obQ4').value = 295123;
+    } else if (primaryRegion === 'ANZ') {
+      // Simpro ANZ 2026 SE Initial Sale MRR quotas (USD) — per the ANZ comp plan.
+      document.getElementById('obQ1').value = 158376;
+      document.getElementById('obQ2').value = 157680;
+      document.getElementById('obQ3').value = 226005;
+      document.getElementById('obQ4').value = 234111;
     }
     document.getElementById('obS1').classList.add('hidden');
     document.getElementById('obS2').classList.remove('hidden');
@@ -1939,7 +1945,6 @@ function buildAETable(sym) {
   while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
   var q = document.getElementById('qSel').value;
   var quota = dashQuota(q);
-  var fx = profile ? (profile.fx || 1.0) : 1.0;
 
   dashboardRegions().forEach(function(region, ri) {
     var regionAEs = pool.filter(function(ae) {
@@ -1947,7 +1952,9 @@ function buildAETable(sym) {
     });
     var rCW = 0;
     regionAEs.forEach(function(ae) { rCW += ae.cw || 0; });
-    var rAtt = quota > 0 ? (rCW * fx) / quota : 0;
+    // CW (BigQuery) and quota are both USD — no FX conversion. Matches the
+    // headline monthly-attainment chart, which also uses cw/quota directly.
+    var rAtt = quota > 0 ? rCW / quota : 0;
     var expanded = !!regionExpanded[region];
 
     // ── Region header row (always visible)
