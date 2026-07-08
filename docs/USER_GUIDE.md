@@ -1,6 +1,6 @@
-# SE Quota Tracker — Comprehensive User Guide
+# SE Attainment Tracker — Comprehensive User Guide
 
-**A complete reference guide for the Simpro Group SE Quota Tracker application.**
+**A complete reference guide for the Simpro Group SE Attainment Tracker application.**
 
 **App URL:** https://se-quota-tracker.web.app
 
@@ -26,7 +26,7 @@
 
 ## Overview
 
-The SE Quota Tracker is a real-time attainment and commission tracking tool for Simpro Group Sales Engineers. It pulls actual Closed Won revenue from BigQuery (our data warehouse) and calculates commission payouts based on each SE's individual comp plan.
+The SE Attainment Tracker is a real-time attainment and commission tracking tool for Simpro Group Sales Engineers. It pulls actual Closed Won revenue from BigQuery (our data warehouse) and calculates commission payouts based on each SE's individual comp plan.
 
 **Key features:**
 - Real-time Closed Won data synced nightly from BigQuery
