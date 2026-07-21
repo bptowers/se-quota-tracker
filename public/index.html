@@ -503,9 +503,8 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
       <div>
         <h1 class="text-xl font-bold text-slate-800">FY 2026 SE Attainment Report</h1>
-        <p class="text-sm text-slate-400 mt-0.5">Sample data · Generated <span id="rptDate">—</span></p>
+        <p class="text-sm text-slate-400 mt-0.5">Live data from BigQuery · Generated <span id="rptDate">—</span></p>
       </div>
-      <span class="self-start sm:self-auto text-xs bg-amber-100 text-amber-700 font-semibold px-3 py-1.5 rounded-full border border-amber-200">Sample / Demo View</span>
     </div>
 
     <!-- Team KPIs -->
@@ -3017,7 +3016,15 @@ function loadCommHistData(cb) {
 }
 
 // Real attainment from regionPools — all SEs in a region share the same number.
+// SEs not yet on a comp plan (new hires / plan pending). Maintained by hand —
+// add or remove names here as plans are finalised. These SEs show as "No plan
+// yet" on the Report and are excluded from attainment %s, team averages, the
+// chart, and commission history until they're on a plan.
+var SE_NO_PLAN = ['Jack Conley', 'Thomas Worcester'];
+function seHasNoPlan(name) { return SE_NO_PLAN.indexOf(name) !== -1; }
+
 function seMonthAtt(se, m) {
+  if (seHasNoPlan(se.name)) return null;   // not on a comp plan yet — no attainment
   if (!se.region || se.region === 'Global') return null;
   var pool = rptPoolData[se.region + '_' + m];
   if (!pool) return null;
@@ -3037,6 +3044,7 @@ function seYTD(se) {
 }
 
 function seLatestStatus(se) {
+  if (seHasNoPlan(se.name)) return { cls:'bg-amber-100 text-amber-700', label:'No plan yet' };
   var lastA = null;
   ELAPSED_MONTHS.forEach(function(m) { var a = seMonthAtt(se, m); if (a !== null) lastA = a; });
   if (lastA === null) return { cls:'bg-slate-100 text-slate-500',  label:'—'            };
@@ -3169,7 +3177,7 @@ function rebuildRptList(seList) {
       tr.appendChild(td);
     });
 
-    app(tr, ctxt('td', 'px-3 py-2.5 text-right text-xs font-mono font-semibold text-slate-700', fmt(ytd)));
+    app(tr, ctxt('td', 'px-3 py-2.5 text-right text-xs font-mono font-semibold text-slate-700', seHasNoPlan(se.name) ? '—' : fmt(ytd)));
 
     var stCell = cel('td', 'px-4 py-2.5 text-center');
     app(stCell, ctxt('span', 'text-xs font-semibold px-2 py-0.5 rounded-full ' + st.cls, st.label));
@@ -3236,7 +3244,7 @@ function buildCommHistSummaryTable(container) {
     var profile = commHistProfilesCache.find(function(p){ return (p.displayName || p.name) === se.name; });
     if (!profile) return;  // skip if not in roster
 
-    var hasOTE = profile.annualOTE || profile.monthlyOTE;
+    var hasOTE = !seHasNoPlan(se.name) && (profile.annualOTE || profile.monthlyOTE);
     var monthlyOTE = profile.monthlyOTE || (profile.annualOTE ? profile.annualOTE * 0.30 / 12 : 0);
 
     var row = document.createElement('tr');
@@ -3301,8 +3309,9 @@ function buildCommHistDetailCard(container, seName) {
   while (container.firstChild) container.removeChild(container.firstChild);
 
   var profile = commHistProfilesCache.find(function(p){ return (p.displayName || p.name) === seName; });
-  if (!profile || !profile.annualOTE) {
-    var msg = ctxt('div', 'text-slate-500 text-sm py-4', seName + ' — no OTE or quotas set');
+  if (!profile || !profile.annualOTE || seHasNoPlan(seName)) {
+    var msg = ctxt('div', 'text-slate-500 text-sm py-4',
+      seName + (seHasNoPlan(seName) ? ' — not on a comp plan yet' : ' — no OTE or quotas set'));
     container.appendChild(msg);
     return;
   }
