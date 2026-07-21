@@ -2550,19 +2550,20 @@ function buildForecastBoard() {
   });
 }
 
-function forecastRow(mode, label, cw, proj, quota, isTotal) {
+function forecastRow(mode, label, cw, proj, quota, isTotal, opts) {
+  opts = opts || {};
   var hasQuota = quota > 0;
   var projPct  = hasQuota ? proj / quota : 0;
   var gap      = hasQuota ? Math.max(0, quota - cw) : 0;
   var tr = document.createElement('tr');
-  tr.className = 'border-t border-slate-100' + (isTotal ? ' font-semibold bg-slate-50' : '');
+  tr.className = 'border-t border-slate-100' + (isTotal ? ' font-semibold bg-slate-50' : (opts.group ? ' font-semibold' : ''));
   var badge = !hasQuota ? ['bg-slate-100 text-slate-500', 'set quota']
             : projPct >= 1 ? ['bg-green-100 text-green-700', 'On track']
             : projPct >= 0.8 ? ['bg-amber-100 text-amber-700', 'Watch']
             : ['bg-red-100 text-red-700', 'At risk'];
   var pctCls = !hasQuota ? 'text-slate-400'
              : projPct >= 1 ? 'text-green-600' : projPct >= 0.8 ? 'text-amber-600' : 'text-red-600';
-  app(tr, ctxt('td', 'px-2 py-1.5 text-slate-700', label));
+  app(tr, ctxt('td', 'px-2 py-1.5 ' + (opts.indent ? 'pl-6 text-slate-500' : 'text-slate-700'), (opts.indent ? '↳ ' : '') + label));
   app(tr, ctxt('td', 'px-2 py-1.5 text-right font-mono text-slate-600', fmt(cw)));
   if (mode === 'projection') app(tr, ctxt('td', 'px-2 py-1.5 text-right font-mono text-slate-800', fmt(proj)));
   app(tr, ctxt('td', 'px-2 py-1.5 text-right font-mono ' + pctCls, hasQuota ? Math.round(projPct * 100) + '%' : '—'));
@@ -2592,7 +2593,24 @@ function renderForecastTable(card, loadingNote, qtd, tQ, pace, mode, curQ, curDa
 
   var tbody = document.createElement('tbody');
   var tot = { cw: 0, quota: 0, proj: 0 };
+  var UK_BUS = ['UK', 'BigChange'];
+
+  // United Kingdom umbrella: a combined subtotal row, then the two BUs indented.
+  var ukCW = 0, ukQuota = 0, ukProj = 0;
+  UK_BUS.forEach(function(rk) {
+    var cw = qtd[rk] || 0, quo = regionQuota(rk, qKey);
+    ukCW += cw; ukQuota += quo; ukProj += cw * pace;
+  });
+  tot.cw += ukCW; tot.quota += ukQuota; tot.proj += ukProj;
+  tbody.appendChild(forecastRow(mode, 'United Kingdom', ukCW, ukProj, ukQuota, false, { group: true }));
+  UK_BUS.forEach(function(rk) {
+    var cw = qtd[rk] || 0, quo = regionQuota(rk, qKey);
+    tbody.appendChild(forecastRow(mode, REGION_LABELS[rk] || rk, cw, cw * pace, quo, false, { indent: true }));
+  });
+
+  // Remaining regions.
   REGION_KEYS.forEach(function(rk) {
+    if (UK_BUS.indexOf(rk) !== -1) return;
     var cw = qtd[rk] || 0;
     var quota = regionQuota(rk, qKey);
     var proj = cw * pace;
@@ -2611,6 +2629,39 @@ function renderForecastTable(card, loadingNote, qtd, tQ, pace, mode, curQ, curDa
     if (curDaysElapsed < 21) note += ' Still early in the quarter — treat the projection as directional.';
   }
   app(card, ctxt('p', 'text-[11px] text-slate-400 mt-2', note));
+}
+
+// One clickable region summary card for Team View (drills into showRegionDetail).
+function regionCard(regionKey, q) {
+  var m = adminRegionMetrics(regionKey, q);
+  var attPct = (m.att * 100).toFixed(1);
+  var badge  = m.att >= 1   ? ['bg-green-100 text-green-700', 'Quota Hit ✓']
+             : m.att >= 0.8 ? ['bg-blue-100 text-blue-700',   'On Track']
+             :                ['bg-slate-100 text-slate-600', 'Building'];
+  var card = cel('button', 'text-left bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-blue-300');
+  card.type = 'button';
+  card.onclick = (function(rk) { return function() { showRegionDetail(rk); }; })(regionKey);
+  var headerRow = cel('div', 'flex items-start justify-between mb-3');
+  var nameDiv   = ctxt('div', 'font-semibold text-slate-800', m.regionName);
+  var metaDiv   = ctxt('div', 'text-xs text-slate-400 mt-0.5', m.aes.length + ' AEs · ' + m.ses.length + ' SE' + (m.ses.length === 1 ? '' : 's'));
+  var infoWrap  = cel('div');
+  app(infoWrap, nameDiv, metaDiv);
+  var badgeEl   = ctxt('span', 'text-xs font-semibold px-2 py-1 rounded-full ' + badge[0], badge[1]);
+  app(headerRow, infoWrap, badgeEl);
+  var attRow = cel('div', 'flex justify-between text-sm');
+  app(attRow, ctxt('span', 'text-slate-500', 'Attainment'), ctxt('span', 'font-bold', attPct + '%'));
+  var barOuter = cel('div', 'h-2 bg-slate-100 rounded-full overflow-hidden');
+  var barInner = cel('div', 'h-full rounded-full ' + barColor(m.att));
+  barInner.style.width = Math.min(m.att * 100, 100) + '%';
+  barOuter.appendChild(barInner);
+  var footRow = cel('div', 'flex justify-between text-xs text-slate-500');
+  app(footRow,
+    ctxt('span', '', fmt(m.poolUSD) + ' / ' + fmt(m.quota)),
+    ctxt('span', 'font-semibold text-blue-600', 'View region detail'));
+  var statsWrap = cel('div', 'space-y-2');
+  app(statsWrap, attRow, barOuter, footRow);
+  app(card, headerRow, statsWrap);
+  return card;
 }
 
 function buildAdminView() {
@@ -2650,45 +2701,37 @@ function buildAdminView() {
         seedRegionQuotasFromProfiles(profiles);
         buildForecastBoard();   // RevOps pace-to-quota board (uses seeded quotas)
         while (grid.firstChild) grid.removeChild(grid.firstChild);
+        grid.className = 'space-y-5';   // stack the UK umbrella group above the rest
 
+        // \u2500\u2500 United Kingdom umbrella: combined subtotal, then the two UK BUs \u2500\u2500
+        // Simpro UK + BigChange are both sold in the UK; group them as one country.
+        var UK_BUS = ['UK', 'BigChange'];
+        var ukCW = 0, ukQuota = 0;
+        UK_BUS.forEach(function(rk) { var mm = adminRegionMetrics(rk, q); ukCW += mm.poolUSD; ukQuota += mm.quota; });
+        var ukAtt = ukQuota > 0 ? ukCW / ukQuota : 0;
+        var ukHead = cel('div', 'flex items-center justify-between gap-3 flex-wrap mb-3 pb-2 border-b-2 border-slate-200');
+        var ukLeft = cel('div', 'flex items-baseline gap-2 flex-wrap');
+        app(ukLeft,
+          ctxt('span', 'text-sm uppercase tracking-wide text-slate-500 font-bold', 'United Kingdom'),
+          ctxt('span', 'text-[11px] text-slate-400', 'Simpro UK + BigChange'));
+        var ukRight = cel('div', 'flex items-center gap-3');
+        app(ukRight,
+          ctxt('span', 'text-sm font-bold ' + attColor(ukAtt), (ukAtt * 100).toFixed(1) + '%'),
+          ctxt('span', 'text-xs font-mono text-slate-500', fmt(ukCW) + ' / ' + fmt(ukQuota)));
+        app(ukHead, ukLeft, ukRight);
+        var ukGrid = cel('div', 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4');
+        UK_BUS.forEach(function(rk) { ukGrid.appendChild(regionCard(rk, q)); });
+        var ukSection = cel('div');
+        app(ukSection, ukHead, ukGrid);
+        grid.appendChild(ukSection);
+
+        // \u2500\u2500 Remaining regions (unchanged, flat grid) \u2500\u2500
+        var otherGrid = cel('div', 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4');
         REGION_KEYS.forEach(function(regionKey) {
-          var m = adminRegionMetrics(regionKey, q);
-          var attPct = (m.att * 100).toFixed(1);
-          var badge  = m.att >= 1   ? ['bg-green-100 text-green-700', 'Quota Hit \u2713']
-                     : m.att >= 0.8 ? ['bg-blue-100 text-blue-700',   'On Track']
-                     :                ['bg-slate-100 text-slate-600', 'Building'];
-
-          var card = cel('button', 'text-left bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-blue-300');
-          card.type = 'button';
-          card.onclick = (function(rk) { return function() { showRegionDetail(rk); }; })(regionKey);
-
-          var headerRow = cel('div', 'flex items-start justify-between mb-3');
-          var nameDiv   = ctxt('div', 'font-semibold text-slate-800', m.regionName);
-          var metaDiv   = ctxt('div', 'text-xs text-slate-400 mt-0.5', m.aes.length + ' AEs \u00b7 ' + m.ses.length + ' SE' + (m.ses.length === 1 ? '' : 's'));
-          var infoWrap  = cel('div');
-          app(infoWrap, nameDiv, metaDiv);
-          var badgeEl   = ctxt('span', 'text-xs font-semibold px-2 py-1 rounded-full ' + badge[0], badge[1]);
-          app(headerRow, infoWrap, badgeEl);
-
-          var attRow = cel('div', 'flex justify-between text-sm');
-          app(attRow, ctxt('span', 'text-slate-500', 'Attainment'), ctxt('span', 'font-bold', attPct + '%'));
-
-          var barOuter = cel('div', 'h-2 bg-slate-100 rounded-full overflow-hidden');
-          var barInner = cel('div', 'h-full rounded-full ' + barColor(m.att));
-          barInner.style.width = Math.min(m.att * 100, 100) + '%';
-          barOuter.appendChild(barInner);
-
-          var footRow = cel('div', 'flex justify-between text-xs text-slate-500');
-          app(footRow,
-            ctxt('span', '', fmt(m.poolUSD) + ' / ' + fmt(m.quota)),
-            ctxt('span', 'font-semibold text-blue-600', 'View region detail'));
-
-          var statsWrap = cel('div', 'space-y-2');
-          app(statsWrap, attRow, barOuter, footRow);
-
-          app(card, headerRow, statsWrap);
-          grid.appendChild(card);
+          if (UK_BUS.indexOf(regionKey) !== -1) return;
+          otherGrid.appendChild(regionCard(regionKey, q));
         });
+        grid.appendChild(otherGrid);
       });
     });
   });
