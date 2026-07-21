@@ -1024,14 +1024,17 @@ function seedRegionQuotasFromProfiles(profiles) {
   REGION_KEYS.forEach(function(rk) { teamQ[rk] = { Q1:0,Q2:0,Q3:0,Q4:0 }; sumQ[rk] = { Q1:0,Q2:0,Q3:0,Q4:0 }; });
   (profiles || []).forEach(function(p) {
     if (isAdminEmail(p.email)) return;
-    regionsOf(p).forEach(function(r) {
-      var rk = normRegion(r);
-      if (!teamQ[rk]) return;
-      Qs.forEach(function(q) {
-        var v = (p.quotas && p.quotas[q]) || 0;
-        teamQ[rk][q] = Math.max(teamQ[rk][q], v);   // shared flat team number
-        sumQ[rk][q] += v;                            // legacy (buggy) summed value
-      });
+    var regs = regionsOf(p);
+    // A multi-region SE (e.g. Matthew: Simpro UK + BigChange) carries ONE
+    // combined quota spanning regions — that's not any single region's team
+    // number, so exclude them or they'd inflate a region's team quota.
+    if (regs.length !== 1) return;
+    var rk = normRegion(regs[0]);
+    if (!teamQ[rk]) return;
+    Qs.forEach(function(q) {
+      var v = (p.quotas && p.quotas[q]) || 0;
+      teamQ[rk][q] = Math.max(teamQ[rk][q], v);   // shared flat team number
+      sumQ[rk][q] += v;                            // legacy (buggy) summed value
     });
   });
   var promises = [];
