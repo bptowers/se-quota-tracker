@@ -1007,31 +1007,46 @@ function adminRosterProfiles(liveProfiles) {
   return profiles;
 }
 
-// Backfill region team quotas from the SEs' personal quotas. Only fills
-// regions MISSING from regionQuotaCfg — never overwrites an admin-set or
-// already-seeded region. Reads regionsOf() so new-flow profiles (regions[]
-// array, no singular region) contribute; updates regionQuotaCfg in place so
-// the current render reflects the seeded values immediately.
+// Backfill each region's TEAM quota from its SEs' personal quotas. NCA SEs in a
+// region share ONE flat team number (each carries the same quota and is comped
+// against the region's total Closed Won), so the region quota is that shared
+// number — the MAX across the region's SEs per quarter — NOT the sum. Summing
+// double-counted the quota and made Team View / Forecast attainment read ~1/N of
+// what each SE sees on their own dashboard.
+//
+// Fills regions with no quota yet, and self-heals any region previously auto-
+// seeded with the buggy summed value; it never overwrites a genuine admin edit
+// (only a value that exactly equals the old sum). Updates regionQuotaCfg in
+// place so the current render reflects it immediately.
 function seedRegionQuotasFromProfiles(profiles) {
-  var regionQuotas = {};
-  REGION_KEYS.forEach(function(rk) { regionQuotas[rk] = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }; });
+  var Qs = ['Q1','Q2','Q3','Q4'];
+  var teamQ = {}, sumQ = {};
+  REGION_KEYS.forEach(function(rk) { teamQ[rk] = { Q1:0,Q2:0,Q3:0,Q4:0 }; sumQ[rk] = { Q1:0,Q2:0,Q3:0,Q4:0 }; });
   (profiles || []).forEach(function(p) {
     if (isAdminEmail(p.email)) return;
     regionsOf(p).forEach(function(r) {
       var rk = normRegion(r);
-      if (rk && regionQuotas[rk]) {
-        ['Q1','Q2','Q3','Q4'].forEach(function(q) {
-          regionQuotas[rk][q] += (p.quotas && p.quotas[q]) || 0;
-        });
-      }
+      if (!teamQ[rk]) return;
+      Qs.forEach(function(q) {
+        var v = (p.quotas && p.quotas[q]) || 0;
+        teamQ[rk][q] = Math.max(teamQ[rk][q], v);   // shared flat team number
+        sumQ[rk][q] += v;                            // legacy (buggy) summed value
+      });
     });
   });
   var promises = [];
   REGION_KEYS.forEach(function(rk) {
-    if (regionQuotaCfg[rk]) return;   // already configured — don't overwrite
-    if (regionQuotas[rk].Q1 || regionQuotas[rk].Q2 || regionQuotas[rk].Q3 || regionQuotas[rk].Q4) {
-      regionQuotaCfg[rk] = { quotas: regionQuotas[rk] };   // reflect in this render
-      promises.push(fsSetRegionQuotas(rk, regionQuotas[rk]));
+    var team = teamQ[rk];
+    if (!(team.Q1 || team.Q2 || team.Q3 || team.Q4)) return;   // no SE data — leave for admin
+    var cur = regionQuotaCfg[rk] && regionQuotaCfg[rk].quotas;
+    // Legacy double-count: stored value exactly equals the old sum, and the sum
+    // differs from the team number (i.e. the region has 2+ quota-carrying SEs).
+    var summedBug = cur
+      && Qs.every(function(q) { return (cur[q] || 0) === sumQ[rk][q]; })
+      && Qs.some(function(q)  { return sumQ[rk][q] !== team[q]; });
+    if (!cur || summedBug) {
+      regionQuotaCfg[rk] = { quotas: team };   // reflect in this render
+      promises.push(fsSetRegionQuotas(rk, team));
     }
   });
   return Promise.all(promises);
@@ -2627,9 +2642,9 @@ function buildAdminView() {
         // missing regions). Fixes regions onboarded after the first seed —
         // previously only ran when regionConfig was entirely empty, so e.g.
         // UK never got a quota once BigChange existed.
-        if (REGION_KEYS.some(function(rk) { return !regionQuotaCfg[rk]; })) {
-          seedRegionQuotasFromProfiles(profiles);
-        }
+        // Seeds missing region quotas and self-heals the old double-counted
+        // (summed) values; writes only when something actually needs fixing.
+        seedRegionQuotasFromProfiles(profiles);
         buildForecastBoard();   // RevOps pace-to-quota board (uses seeded quotas)
         while (grid.firstChild) grid.removeChild(grid.firstChild);
 
