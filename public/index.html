@@ -403,7 +403,7 @@
           <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
             <div>
               <h2 class="font-semibold text-slate-800 text-sm">AE Revenue Pool</h2>
-              <p class="text-xs text-slate-400 mt-0.5">Closed Won (USD) synced from BigQuery · <span id="poolSyncNote">—</span></p>
+              <p class="text-xs text-slate-400 mt-0.5">Closed Won (USD) synced from BigQuery — MRR + annualised ARR (×12) · <span id="poolSyncNote">—</span></p>
             </div>
           </div>
           <div class="overflow-x-auto">
@@ -412,7 +412,8 @@
                 <tr>
                   <th class="px-4 py-2 text-left text-xs font-medium text-slate-500">AE Name</th>
                   <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Type</th>
-                  <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Closed Won $</th>
+                  <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Closed Won (MRR)</th>
+                  <th class="px-2 py-2 text-center text-xs font-medium text-slate-500">Closed Won (ARR)</th>
                   <th class="px-2 py-2 text-center text-xs font-medium text-slate-500 cursor-help" title="% of your total quota. Each region's Closed Won as a percentage of your overall quota target — shows how much each region contributes to your total attainment.">% of Total</th>
                 </tr>
               </thead>
@@ -421,9 +422,10 @@
                 <tr>
                   <td colspan="2" class="px-4 py-2 text-xs font-semibold text-slate-600">Pool Total</td>
                   <td class="px-2 py-2 text-center text-xs font-mono font-bold text-slate-700" id="ftClosed">—</td>
+                  <td class="px-2 py-2 text-center text-xs font-mono font-bold text-slate-700" id="ftArr">—</td>
                 </tr>
                 <tr>
-                  <td colspan="4" class="px-4 py-1.5 text-xs" id="poolGap">—</td>
+                  <td colspan="5" class="px-4 py-1.5 text-xs" id="poolGap">—</td>
                 </tr>
               </tfoot>
             </table>
@@ -2023,6 +2025,12 @@ function buildAETable(sym) {
     hCwTd.textContent = sym + Math.round(rCW).toLocaleString();
     htr.appendChild(hCwTd);
 
+    var hArrTd = document.createElement('td');
+    hArrTd.className = 'px-2 py-2 text-center text-xs font-mono font-bold text-slate-500';
+    hArrTd.id = 'rarr_' + ri;
+    hArrTd.textContent = sym + Math.round(rCW * 12).toLocaleString();
+    htr.appendChild(hArrTd);
+
     var hAttTd = document.createElement('td');
     hAttTd.id = 'ratt_' + ri;
     hAttTd.className = 'px-2 py-2 text-center text-xs font-mono font-semibold cursor-help';
@@ -2043,7 +2051,7 @@ function buildAETable(sym) {
     if (regionAEs.length === 0) {
       var emptyTr = document.createElement('tr');
       var emptyTd = document.createElement('td');
-      emptyTd.colSpan = 4;
+      emptyTd.colSpan = 5;
       emptyTd.className = 'px-8 py-2 text-xs text-slate-400 italic border-t border-slate-100 bg-white';
       emptyTd.textContent = 'No Closed Won synced for this region this quarter';
       emptyTr.appendChild(emptyTd);
@@ -2073,6 +2081,12 @@ function buildAETable(sym) {
       cwCell.className = 'px-2 py-1.5 text-right font-mono text-xs text-slate-700';
       cwCell.textContent = sym + Math.round(ae.cw || 0).toLocaleString();
       tr.appendChild(cwCell);
+
+      // Closed Won ARR = MRR × 12 (display only)
+      var arrCell = document.createElement('td');
+      arrCell.className = 'px-2 py-1.5 text-right font-mono text-xs text-slate-500';
+      arrCell.textContent = sym + Math.round((ae.cw || 0) * 12).toLocaleString();
+      tr.appendChild(arrCell);
 
       tbody.appendChild(tr);
     });
@@ -2250,6 +2264,8 @@ function recalc() {
     var rAtt = quota > 0 ? (rCW * fx) / quota : 0;
     var rcwEl = document.getElementById('rcw_' + ri);
     if (rcwEl) rcwEl.textContent = sym + Math.round(rCW).toLocaleString();
+    var rarrEl = document.getElementById('rarr_' + ri);
+    if (rarrEl) rarrEl.textContent = sym + Math.round(rCW * 12).toLocaleString();
     var rattEl = document.getElementById('ratt_' + ri);
     if (rattEl) {
       if (quota > 0) {
@@ -2306,6 +2322,8 @@ function recalc() {
 
   // AE footer
   document.getElementById('ftClosed').textContent = sym + Math.round(totClosed).toLocaleString();
+  var ftArrEl = document.getElementById('ftArr');
+  if (ftArrEl) ftArrEl.textContent = sym + Math.round(totClosed * 12).toLocaleString();
   document.getElementById('poolUSD').textContent = fmt(poolUSD);
   document.getElementById('fxDisp').textContent = '$' + fx.toFixed(3);
   var gapToQuotaNative = Math.max(0, Math.ceil(quota / fx - totClosed));
@@ -2816,7 +2834,8 @@ function showRegionDetail(regionKey) {
   thead.className = 'bg-slate-50';
   thead.innerHTML = '<tr>'
     + '<th class="px-3 py-2 text-left text-xs font-medium text-slate-500">AE</th>'
-    + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">Closed Won (USD)</th></tr>';
+    + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">Closed Won (MRR)</th>'
+    + '<th class="px-3 py-2 text-right text-xs font-medium text-slate-500">Closed Won (ARR)</th></tr>';
   table.appendChild(thead);
   var tbody = document.createElement('tbody');
   if (!m.aes.length) {
@@ -2832,7 +2851,8 @@ function showRegionDetail(regionKey) {
       tr.className = 'border-t border-slate-100';
       app(tr,
         ctxt('td', 'px-3 py-2 text-slate-700', ae.name || 'Unnamed AE'),
-        ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-700', sym + Math.round(cw).toLocaleString()));
+        ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-700', sym + Math.round(cw).toLocaleString()),
+        ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-500', sym + Math.round(cw * 12).toLocaleString()));
       tbody.appendChild(tr);
     });
   }
