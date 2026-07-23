@@ -1023,6 +1023,9 @@ function seedRegionQuotasFromProfiles(profiles) {
   REGION_KEYS.forEach(function(rk) { teamQ[rk] = { Q1:0,Q2:0,Q3:0,Q4:0 }; sumQ[rk] = { Q1:0,Q2:0,Q3:0,Q4:0 }; });
   (profiles || []).forEach(function(p) {
     if (isAdminEmail(p.email)) return;
+    // SEs not yet on a comp plan often onboard with placeholder quotas — don't
+    // let those seed / distort a region's team quota.
+    if (seHasNoPlan(p.displayName || p.name)) return;
     var regs = regionsOf(p);
     // A multi-region SE (e.g. Matthew: Simpro UK + BigChange) carries ONE
     // combined quota spanning regions — that's not any single region's team
