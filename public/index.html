@@ -2940,6 +2940,7 @@ var SE_ROSTER = [
   { name:'Thomas Worcester',   region:'US',         title:'Sales Engineer',                         manager:'Brad Towers' },
   { name:'TBH (Joe Backfill)', region:'US',         title:'Sales Engineer',                         manager:'Brad Towers' },
   { name:'Sarah Sareh',        region:'US',         title:'Senior Sales Engineer',                  manager:'Brad Towers' },
+  { name:'George Tobon',       region:'US',         title:'Sales Engineer',                         manager:'Brad Towers' },
   { name:'Adam Skinner',       region:'UK',         title:'Sales Engineer',                         manager:'Brad Towers' },
   { name:'Jason Passey',       region:'UK',         title:'Sales Engineer',                         manager:'Brad Towers' },
   { name:'Dave Shaw',          region:'BigChange',  title:'Sales Engineer',                         manager:'Brad Towers' },
@@ -3020,7 +3021,7 @@ function loadCommHistData(cb) {
 // add or remove names here as plans are finalised. These SEs show as "No plan
 // yet" on the Report and are excluded from attainment %s, team averages, the
 // chart, and commission history until they're on a plan.
-var SE_NO_PLAN = ['Jack Conley', 'Thomas Worcester'];
+var SE_NO_PLAN = ['Jack Conley', 'Thomas Worcester', 'George Tobon'];
 function seHasNoPlan(name) { return SE_NO_PLAN.indexOf(name) !== -1; }
 
 function seMonthAtt(se, m) {
@@ -3037,22 +3038,33 @@ function seMonthQuota(se, m) { return regionQuota(se.region, m); }
 // have no comp plan / no OTE. Pulls OTE + quotas from their live profile
 // (commHistProfilesCache) plus the region's monthly Closed Won. Requires
 // commHistPoolsCache + commHistProfilesCache to be loaded (see buildReportTab).
+// Monthly commission OTE for a profile = 30% of annual OTE ÷ 12 (the commission-
+// eligible portion). ALWAYS derived from annualOTE — the stored monthlyOTE field
+// is inconsistent across profiles (some hold annual÷12 without the 30% factor, or
+// 0), so it's only a last-resort fallback when annualOTE is missing.
+function profileCommMonthlyOTE(profile) {
+  if (!profile) return 0;
+  if (profile.annualOTE) return profile.annualOTE * COMMISSION_PCT / 12;
+  return profile.monthlyOTE || 0;
+}
+
 function seCompCtx(se) {
   if (seHasNoPlan(se.name)) return null;
   var profile = commHistProfilesCache && commHistProfilesCache.find(function(p) {
     return (p.displayName || p.name) === se.name;
   });
   if (!profile) return null;
-  var monthlyOTE = profile.monthlyOTE || (profile.annualOTE ? profile.annualOTE * COMMISSION_PCT / 12 : 0);
+  var monthlyOTE = profileCommMonthlyOTE(profile);
   if (!monthlyOTE) return null;
   return { monthlyOTE: monthlyOTE, quotas: profile.quotas, regionData: buildMonthlyDataForSE(se.region) };
 }
 
 // YTD commission earned = sum of the monthly draw / quarterly true-up across
-// elapsed months, using the SE's real OTE + quotas. 0 if no comp plan / no OTE.
+// elapsed months, using the SE's real OTE + quotas. Returns null when it can't
+// be computed (no comp plan / no profile / no OTE) → shown as "—", not "$0".
 function seYTD(se) {
   var ctx = seCompCtx(se);
-  if (!ctx) return 0;
+  if (!ctx) return null;
   var total = 0;
   ELAPSED_MONTHS.forEach(function(m) {
     total += quarterlyDrawForSE(m, ctx.regionData, ctx.quotas, ctx.monthlyOTE).pay;
@@ -3197,7 +3209,7 @@ function rebuildRptList(seList) {
       tr.appendChild(td);
     });
 
-    app(tr, ctxt('td', 'px-3 py-2.5 text-right text-xs font-mono font-semibold text-slate-700', seHasNoPlan(se.name) ? '—' : fmt(ytd)));
+    app(tr, ctxt('td', 'px-3 py-2.5 text-right text-xs font-mono font-semibold text-slate-700', ytd === null ? '—' : fmt(ytd)));
 
     var stCell = cel('td', 'px-4 py-2.5 text-center');
     app(stCell, ctxt('span', 'text-xs font-semibold px-2 py-0.5 rounded-full ' + st.cls, st.label));
@@ -3265,7 +3277,7 @@ function buildCommHistSummaryTable(container) {
     if (!profile) return;  // skip if not in roster
 
     var hasOTE = !seHasNoPlan(se.name) && (profile.annualOTE || profile.monthlyOTE);
-    var monthlyOTE = profile.monthlyOTE || (profile.annualOTE ? profile.annualOTE * 0.30 / 12 : 0);
+    var monthlyOTE = profileCommMonthlyOTE(profile);
 
     var row = document.createElement('tr');
     row.className = 'border-t border-slate-100' + (idx % 2 === 1 ? ' bg-slate-50' : '');
@@ -3336,7 +3348,7 @@ function buildCommHistDetailCard(container, seName) {
     return;
   }
 
-  var monthlyOTE = profile.monthlyOTE || (profile.annualOTE * 0.30 / 12);
+  var monthlyOTE = profileCommMonthlyOTE(profile);
   var regionData = buildMonthlyDataForSE(primaryRegionOf(profile));
 
   var table = cel('table', 'w-full text-sm border-collapse');
@@ -3485,7 +3497,7 @@ function buildSeCard(se, idx, ytd, st, avatarColors) {
 
   var ytdBox = app(cel('div', 'text-right'),
     ctxt('div', 'text-xs text-slate-400', 'YTD Commission'),
-    ctxt('div', 'font-bold text-slate-800 text-sm', seHasNoPlan(se.name) ? '—' : fmt(ytd)));
+    ctxt('div', 'font-bold text-slate-800 text-sm', ytd === null ? '—' : fmt(ytd)));
 
   app(header,
     app(cel('div', 'flex items-center gap-3'), avatar, infoEl),
