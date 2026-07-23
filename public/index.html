@@ -3032,13 +3032,30 @@ function seMonthAtt(se, m) {
   return q ? Math.round((pool.totalCwUSD / q) * 100) / 100 : null;
 }
 function seMonthQuota(se, m) { return regionQuota(se.region, m); }
-function seMonthlyOTE(se) { return 0; }
 
+// An SE's real comp context for the Report's commission figures, or null if they
+// have no comp plan / no OTE. Pulls OTE + quotas from their live profile
+// (commHistProfilesCache) plus the region's monthly Closed Won. Requires
+// commHistPoolsCache + commHistProfilesCache to be loaded (see buildReportTab).
+function seCompCtx(se) {
+  if (seHasNoPlan(se.name)) return null;
+  var profile = commHistProfilesCache && commHistProfilesCache.find(function(p) {
+    return (p.displayName || p.name) === se.name;
+  });
+  if (!profile) return null;
+  var monthlyOTE = profile.monthlyOTE || (profile.annualOTE ? profile.annualOTE * COMMISSION_PCT / 12 : 0);
+  if (!monthlyOTE) return null;
+  return { monthlyOTE: monthlyOTE, quotas: profile.quotas, regionData: buildMonthlyDataForSE(se.region) };
+}
+
+// YTD commission earned = sum of the monthly draw / quarterly true-up across
+// elapsed months, using the SE's real OTE + quotas. 0 if no comp plan / no OTE.
 function seYTD(se) {
+  var ctx = seCompCtx(se);
+  if (!ctx) return 0;
   var total = 0;
   ELAPSED_MONTHS.forEach(function(m) {
-    var a = seMonthAtt(se, m);
-    if (a !== null) total += payout(a * seMonthQuota(se, m), seMonthQuota(se, m), seMonthlyOTE(se)).pay;
+    total += quarterlyDrawForSE(m, ctx.regionData, ctx.quotas, ctx.monthlyOTE).pay;
   });
   return total;
 }
@@ -3101,32 +3118,35 @@ function buildReportTab() {
   spinner.textContent = 'Loading…';
   kpisEl.appendChild(spinner);
 
+  // Load region pools (monthly attainment) AND commission-history data
+  // (profiles + all-elapsed-month pools) BEFORE rendering, so the SE list's
+  // per-SE YTD commission can be computed from real OTE/quotas.
   loadRptPools(function() {
-    // ── Team KPIs (across elapsed months)
-    var atQuota=0, sumAtt=0, cntAtt=0;
-    RPT_SE_LIST.forEach(function(se) {
-      ELAPSED_MONTHS.forEach(function(m) {
-        var a = seMonthAtt(se, m);
-        if (a === null) return;
-        sumAtt += a; cntAtt++;
-        if (a >= 1) atQuota++;
-      });
-    });
-    var avgAtt = cntAtt ? sumAtt / cntAtt : 0;
-
-    while (kpisEl.firstChild) kpisEl.removeChild(kpisEl.firstChild);
-    app(kpisEl,
-      mkKpiNode('Team Size',            RPT_SE_LIST.length + ' SEs',            'FY 2026 live',         'text-slate-800'),
-      mkKpiNode('Avg Attainment (YTD)', Math.round(avgAtt * 100) + '%',         'Months elapsed',       avgAtt >= 1 ? 'text-green-600' : avgAtt >= 0.8 ? 'text-blue-600' : 'text-slate-600'),
-      mkKpiNode('Months at Quota',      atQuota + ' of ' + cntAtt,              'SE-month slots',       'text-blue-600'),
-      mkKpiNode('Regions Live',         Object.keys(rptPoolData).length + ' pools', 'from BigQuery',    'text-slate-800')
-    );
-
-    buildReportChart();
-    rebuildRptList(RPT_SE_LIST);
-
-    // ── Load commission history data and populate dropdown
     loadCommHistData(function() {
+      // ── Team KPIs (across elapsed months)
+      var atQuota=0, sumAtt=0, cntAtt=0;
+      RPT_SE_LIST.forEach(function(se) {
+        ELAPSED_MONTHS.forEach(function(m) {
+          var a = seMonthAtt(se, m);
+          if (a === null) return;
+          sumAtt += a; cntAtt++;
+          if (a >= 1) atQuota++;
+        });
+      });
+      var avgAtt = cntAtt ? sumAtt / cntAtt : 0;
+
+      while (kpisEl.firstChild) kpisEl.removeChild(kpisEl.firstChild);
+      app(kpisEl,
+        mkKpiNode('Team Size',            RPT_SE_LIST.length + ' SEs',            'FY 2026 live',         'text-slate-800'),
+        mkKpiNode('Avg Attainment (YTD)', Math.round(avgAtt * 100) + '%',         'Months elapsed',       avgAtt >= 1 ? 'text-green-600' : avgAtt >= 0.8 ? 'text-blue-600' : 'text-slate-600'),
+        mkKpiNode('Months at Quota',      atQuota + ' of ' + cntAtt,              'SE-month slots',       'text-blue-600'),
+        mkKpiNode('Regions Live',         Object.keys(rptPoolData).length + ' pools', 'from BigQuery',    'text-slate-800')
+      );
+
+      buildReportChart();
+      rebuildRptList(RPT_SE_LIST);
+
+      // ── Commission-history dropdown + section
       var sel = document.getElementById('commHistSeSel');
       while (sel.options.length > 1) sel.remove(1);
       RPT_SE_LIST.forEach(function(se) {
@@ -3465,7 +3485,7 @@ function buildSeCard(se, idx, ytd, st, avatarColors) {
 
   var ytdBox = app(cel('div', 'text-right'),
     ctxt('div', 'text-xs text-slate-400', 'YTD Commission'),
-    ctxt('div', 'font-bold text-slate-800 text-sm', ytd > 0 ? fmt(ytd) : '—'));
+    ctxt('div', 'font-bold text-slate-800 text-sm', seHasNoPlan(se.name) ? '—' : fmt(ytd)));
 
   app(header,
     app(cel('div', 'flex items-center gap-3'), avatar, infoEl),
@@ -3475,11 +3495,12 @@ function buildSeCard(se, idx, ytd, st, avatarColors) {
   card.appendChild(header);
 
   // ── Monthly strips (last 3 months)
+  var ctx = seCompCtx(se);   // real OTE/quotas for commission, or null if no plan
   var grid = cel('div', 'grid grid-cols-1 md:grid-cols-3 divide-x divide-y md:divide-y-0 divide-slate-100');
   RPT_MONTHS.forEach(function(m) {
     var a = seMonthAtt(se, m);
     var isPending = (a === null);
-    var qComm = isPending ? 0 : payout(a * seMonthQuota(se, m), seMonthQuota(se, m), seMonthlyOTE(se)).pay;
+    var qComm = (isPending || !ctx) ? 0 : quarterlyDrawForSE(m, ctx.regionData, ctx.quotas, ctx.monthlyOTE).pay;
     var barW  = isPending ? 0 : Math.round(Math.min(a, 1.0) * 100);
 
     var strip = cel('div', 'p-3.5' + (isPending ? ' bg-slate-50/70' : ''));
@@ -3497,7 +3518,7 @@ function buildSeCard(se, idx, ytd, st, avatarColors) {
     barOuter.appendChild(barInner);
 
     var commEl = ctxt('div', 'text-xs text-slate-400',
-      isPending ? '—' : (seMonthlyOTE(se) === 0 ? '—' : (qComm > 0 ? fmt(qComm) + ' earned' : 'No payout')));
+      isPending ? '—' : (!ctx ? '—' : (qComm > 0 ? fmt(qComm) + ' earned' : 'No payout')));
 
     app(strip, stripHdr, barOuter, commEl);
     grid.appendChild(strip);
