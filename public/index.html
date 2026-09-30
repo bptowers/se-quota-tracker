@@ -1215,6 +1215,18 @@ function uid(email) {
 
 function fmt(n) { return isNaN(n) ? '$0' : '$' + Math.round(n).toLocaleString(); }
 
+// Closed Won and quotas are USD, but OTE and commission are in each SE's own
+// pay currency (annualOTE is entered in local currency at onboarding).
+var REGION_CURRENCY = { UK:'£', BigChange:'£', ANZ:'A$', US:'$', ClockShark:'$' };
+function currencySymbolFor(p) {
+  if (!p) return '$';
+  if (p.currency) return p.currency;
+  return REGION_CURRENCY[normRegion(primaryRegionOf(p))] || '$';
+}
+function commSym() { return currencySymbolFor(activeCompProfile()); }
+function fmtMoney(n, sym) { return (sym || '$') + Math.round(isNaN(n) ? 0 : n).toLocaleString(); }
+function fmtComm(n) { return fmtMoney(n, commSym()); }
+
 var LONG_MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
@@ -1813,7 +1825,7 @@ function buildMonthlyAttChart(data) {
               return [
                 'CW: $' + Math.round(cw).toLocaleString(),
                 'Attainment: ' + att + '%',
-                'Commission: $' + Math.round(comm).toLocaleString()
+                'Commission: ' + fmtComm(comm)
               ];
             }
           }
@@ -1903,13 +1915,13 @@ function buildMonthlyCommChart(data) {
         tooltip: {
           callbacks: {
             label: function(ctx) {
-              if (ctx.datasetIndex === 1) return 'Monthly Commission Target: $' + Math.round(ctx.parsed.y).toLocaleString();
+              if (ctx.datasetIndex === 1) return 'Monthly Commission Target: ' + fmtComm(ctx.parsed.y);
               var m = MONTH_KEYS[ctx.dataIndex];
               var quota = compensationMonthlyQuota(m);
               var cw = data[m] || 0;
               var att = quota > 0 ? (cw / quota * 100).toFixed(1) : '—';
               return [
-                'Commission: $' + Math.round(ctx.parsed.y).toLocaleString(),
+                'Commission: ' + fmtComm(ctx.parsed.y),
                 'Attainment: ' + att + '%'
               ];
             }
@@ -1921,7 +1933,7 @@ function buildMonthlyCommChart(data) {
         y: {
           ticks: {
             font: { size: 10 },
-            callback: function(v) { return '$' + (v >= 1000 ? Math.round(v / 1000) + 'k' : v); }
+            callback: function(v) { return commSym() + (v >= 1000 ? Math.round(v / 1000) + 'k' : v); }
           },
           grid: { color: 'rgba(226,232,240,0.8)' }
         }
@@ -1996,7 +2008,7 @@ function buildQuarterlySummary(data) {
       cwSpan.textContent = 'CW $' + Math.round(qCW).toLocaleString();
       var commSpan = document.createElement('span');
       commSpan.className = 'font-mono font-semibold ' + (isCurrentQ ? 'text-blue-700' : 'text-slate-700');
-      commSpan.textContent = '$' + Math.round(qComm).toLocaleString();
+      commSpan.textContent = fmtComm(qComm);
       detail.appendChild(cwSpan);
       detail.appendChild(commSpan);
       row.appendChild(detail);
@@ -2022,13 +2034,13 @@ function buildQuarterlySummary(data) {
   aCW.textContent = 'YTD $' + Math.round(ytdCW).toLocaleString();
   var aComm = document.createElement('span');
   aComm.className = 'font-mono font-semibold text-slate-700';
-  aComm.textContent = '$' + Math.round(ytdComm).toLocaleString() + ' earned';
+  aComm.textContent = fmtComm(ytdComm) + ' earned';
   aDetail.appendChild(aCW);
   aDetail.appendChild(aComm);
   annualEl.appendChild(aDetail);
   var aRun = document.createElement('div');
   aRun.className = 'text-slate-400 mt-0.5';
-  aRun.textContent = 'Run-rate: $' + runRate.toLocaleString() + '/yr';
+  aRun.textContent = 'Run-rate: ' + fmtComm(runRate) + '/yr';
   annualEl.appendChild(aRun);
 }
 
@@ -2073,7 +2085,7 @@ function buildScenarioOutput() {
     lbl.textContent = label;
     var val = document.createElement('span');
     val.className = 'font-mono font-bold text-blue-700 text-sm';
-    val.textContent = '$' + Math.round(value).toLocaleString();
+    val.textContent = fmtComm(value);
     rowTop.appendChild(lbl);
     rowTop.appendChild(val);
     row.appendChild(rowTop);
@@ -2407,10 +2419,10 @@ function recalc() {
   // Commission $ is per-SE; not meaningful on the global "All Regions" rollup.
   document.getElementById('kpiComm').textContent = dashIsAll()
     ? '—'
-    : (compInputsAvailable ? fmt(pay) : 'Unavailable');
+    : (compInputsAvailable ? fmtComm(pay) : 'Unavailable');
   document.getElementById('kpiOTE').textContent = dashIsAll()
     ? '—'
-    : (compInputsAvailable ? fmt(ote) : '—');
+    : (compInputsAvailable ? fmtComm(ote) : '—');
   var commTitle = document.getElementById('kpiCommTitle');
   var commSub = document.getElementById('kpiCommSub');
   if (commTitle) {
@@ -2450,7 +2462,7 @@ function recalc() {
   document.getElementById('fxDisp').textContent = '$' + fx.toFixed(3);
   var gapToQuotaNative = Math.max(0, Math.ceil(quota / fx - totClosed));
   document.getElementById('poolGap').innerHTML = att >= 1
-    ? '<span class="text-green-600 font-semibold">✓ Quota hit</span> — earning ' + fmt(pay)
+    ? '<span class="text-green-600 font-semibold">✓ Quota hit</span> — earning ' + fmtComm(pay)
     : '<strong class="text-slate-700">' + sym + gapToQuotaNative.toLocaleString() + '</strong> more to reach 100% quota';
 
   // Nav KPI: Net Topline
@@ -2491,7 +2503,7 @@ function buildThresh(quota, ote, poolUSD, fx, sym) {
       + '<span class="text-xl">' + t.icon + '</span>'
       + '<div class="flex-1 min-w-0"><div class="text-xs font-semibold text-slate-700">' + t.label + '</div>'
       + '<div class="text-xs text-slate-500 mt-0.5">' + (done ? '<span class="text-green-600 font-semibold">✓ Achieved</span>' : 'Need ' + fmt(remUSD) + ' (' + sym + Math.round(remNat).toLocaleString() + ') more') + '</div>'
-      + '<div class="text-xs text-slate-400">Commission at this point: <span class="font-semibold text-slate-700">' + fmt(pay) + '</span></div>'
+      + '<div class="text-xs text-slate-400">Commission at this point: <span class="font-semibold text-slate-700">' + fmtComm(pay) + '</span></div>'
       + '</div></div>';
   });
   document.getElementById('threshCards').innerHTML = html;
@@ -2953,9 +2965,9 @@ function showRegionDetail(regionKey) {
       tr.className = 'border-t border-slate-100';
       app(tr,
         ctxt('td', 'px-3 py-2 text-slate-700', se.displayName || se.email || 'Unnamed SE'),
-        ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-700', ote ? fmt(ote) : '—'),
+        ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-700', ote ? fmtMoney(ote, currencySymbolFor(se)) : '—'),
         ctxt('td', 'px-3 py-2 text-center font-mono text-xs ' + attColor(seResult.att), seQuota ? (seResult.att * 100).toFixed(0) + '%' : '—'),
-        ctxt('td', 'px-3 py-2 text-right font-mono text-xs font-semibold text-slate-800', (ote && seQuota) ? fmt(seResult.pay) : '—'));
+        ctxt('td', 'px-3 py-2 text-right font-mono text-xs font-semibold text-slate-800', (ote && seQuota) ? fmtMoney(seResult.pay, currencySymbolFor(se)) : '—'));
       seBody.appendChild(tr);
     });
     seTable.appendChild(seBody);
@@ -3032,10 +3044,10 @@ function buildEarnedCommCard(currentCW, currentQuota, ote, daysElapsed, daysInMo
   var projectedComm = projectedRes.pay;
   var quotaPotential = ote; // 100% of quota = 100% of OTE
 
-  earnEl.textContent = fmt(earnedComm);
+  earnEl.textContent = fmtComm(earnedComm);
   barEl.style.width = Math.min(100, (earnedComm / ote * 100)) + '%';
-  paceEl.textContent = fmt(projectedComm);
-  quotaEl.textContent = fmt(quotaPotential);
+  paceEl.textContent = fmtComm(projectedComm);
+  quotaEl.textContent = fmtComm(quotaPotential);
 }
 
 function buildGapToQuotaCard(currentCW, currentQuota, ote) {
@@ -3080,7 +3092,7 @@ function buildGapToQuotaCard(currentCW, currentQuota, ote) {
 
     var comm = document.createElement('div');
     comm.className = 'text-[10px] text-slate-400';
-    comm.textContent = 'Commission at this point: ' + fmt(commAtMilestone);
+    comm.textContent = 'Commission at this point: ' + fmtComm(commAtMilestone);
     row.appendChild(comm);
 
     rowsEl.appendChild(row);
@@ -3392,7 +3404,7 @@ function rebuildRptList(seList) {
       tr.appendChild(td);
     });
 
-    app(tr, ctxt('td', 'px-3 py-2.5 text-right text-xs font-mono font-semibold text-slate-700', ytd === null ? '—' : fmt(ytd)));
+    app(tr, ctxt('td', 'px-3 py-2.5 text-right text-xs font-mono font-semibold text-slate-700', ytd === null ? '—' : fmtMoney(ytd, currencySymbolFor(profileForSE(se)))));
 
     var stCell = cel('td', 'px-4 py-2.5 text-center');
     app(stCell, ctxt('span', 'text-xs font-semibold px-2 py-0.5 rounded-full ' + st.cls, st.label));
@@ -3461,6 +3473,7 @@ function buildCommHistSummaryTable(container) {
 
     var monthlyOTE = profileCommMonthlyOTE(profile);
     var hasOTE = !seHasNoPlan(se.name) && monthlyOTE > 0;
+    var sym = currencySymbolFor(profile);
 
     var row = document.createElement('tr');
     row.className = 'border-t border-slate-100' + (idx % 2 === 1 ? ' bg-slate-50' : '');
@@ -3489,11 +3502,11 @@ function buildCommHistSummaryTable(container) {
 
     var nameCell = ctxt('td', 'px-3 py-2 font-medium text-slate-700', se.name);
     var regionCell = ctxt('td', 'px-3 py-2 text-center text-slate-600', se.region);
-    var q1Cell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs ' + (hasOTE ? 'text-slate-700' : 'text-slate-400'), (hasOTE && qComms[0] !== null) ? fmt(qComms[0]) : '—');
-    var q2Cell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs ' + (hasOTE ? 'text-slate-700' : 'text-slate-400'), (hasOTE && qComms[1] !== null) ? fmt(qComms[1]) : '—');
-    var q3Cell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs ' + (hasOTE ? 'text-slate-700' : 'text-slate-400'), (hasOTE && qComms[2] !== null) ? fmt(qComms[2]) : '—');
-    var q4Cell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs ' + (hasOTE ? 'text-slate-700' : 'text-slate-400'), (hasOTE && qComms[3] !== null) ? fmt(qComms[3]) : '—');
-    var annualCell = ctxt('td', 'px-3 py-2 text-right font-mono font-semibold text-xs ' + (hasOTE ? 'text-slate-800' : 'text-slate-400'), hasOTE ? fmt(annualComm) : '—');
+    var q1Cell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs ' + (hasOTE ? 'text-slate-700' : 'text-slate-400'), (hasOTE && qComms[0] !== null) ? fmtMoney(qComms[0], sym) : '—');
+    var q2Cell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs ' + (hasOTE ? 'text-slate-700' : 'text-slate-400'), (hasOTE && qComms[1] !== null) ? fmtMoney(qComms[1], sym) : '—');
+    var q3Cell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs ' + (hasOTE ? 'text-slate-700' : 'text-slate-400'), (hasOTE && qComms[2] !== null) ? fmtMoney(qComms[2], sym) : '—');
+    var q4Cell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs ' + (hasOTE ? 'text-slate-700' : 'text-slate-400'), (hasOTE && qComms[3] !== null) ? fmtMoney(qComms[3], sym) : '—');
+    var annualCell = ctxt('td', 'px-3 py-2 text-right font-mono font-semibold text-xs ' + (hasOTE ? 'text-slate-800' : 'text-slate-400'), hasOTE ? fmtMoney(annualComm, sym) : '—');
 
     row.appendChild(nameCell);
     row.appendChild(regionCell);
@@ -3538,6 +3551,7 @@ function buildCommHistDetailCard(container, seName) {
 
   var monthlyOTE = profileCommMonthlyOTE(profile);
   var regionData = buildMonthlyDataForSE(regionsOf(profile));
+  var sym = currencySymbolFor(profile);
 
   var table = cel('table', 'w-full text-sm border-collapse');
   var thead = document.createElement('thead');
@@ -3569,7 +3583,7 @@ function buildCommHistDetailCard(container, seName) {
       qtRow.className = 'bg-blue-50 border-t-2 border-slate-200';
       var qtLabel = ctxt('td', 'px-3 py-2.5 font-semibold text-slate-800', 'Q' + lastQ + ' Total');
       var qtTypeCell = cel('td', '');
-      var qtCommCell = ctxt('td', 'px-3 py-2.5 text-right font-mono font-semibold text-blue-700', fmt(qTotals[lastQ]));
+      var qtCommCell = ctxt('td', 'px-3 py-2.5 text-right font-mono font-semibold text-blue-700', fmtMoney(qTotals[lastQ], sym));
       var qtCwCell = cel('td', '');
       var qtAttCell = cel('td', '');
       qtRow.appendChild(qtLabel);
@@ -3591,7 +3605,7 @@ function buildCommHistDetailCard(container, seName) {
 
     var mCell = ctxt('td', 'px-3 py-2 font-medium text-slate-700', monthLabel);
     var typeCell = ctxt('td', 'px-3 py-2 text-center text-xs font-semibold px-2 py-1 rounded ' + typeBg + ' ' + typeColor, typeLabel);
-    var commCell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs font-semibold text-slate-800', fmt(commission.pay));
+    var commCell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs font-semibold text-slate-800', fmtMoney(commission.pay, sym));
     var cwCell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-600', fmt(cw));
     var attCell = ctxt('td', 'px-3 py-2 text-right font-mono text-xs text-slate-600', (commission.att * 100).toFixed(1) + '%');
 
@@ -3609,7 +3623,7 @@ function buildCommHistDetailCard(container, seName) {
     qtRow.className = 'bg-blue-50 border-t-2 border-slate-200';
     var qtLabel = ctxt('td', 'px-3 py-2.5 font-semibold text-slate-800', 'Q' + lastQ + ' Total');
     var qtTypeCell = cel('td', '');
-    var qtCommCell = ctxt('td', 'px-3 py-2.5 text-right font-mono font-semibold text-blue-700', fmt(qTotals[lastQ]));
+    var qtCommCell = ctxt('td', 'px-3 py-2.5 text-right font-mono font-semibold text-blue-700', fmtMoney(qTotals[lastQ], sym));
     var qtCwCell = cel('td', '');
     var qtAttCell = cel('td', '');
     qtRow.appendChild(qtLabel);
@@ -3685,7 +3699,7 @@ function buildSeCard(se, idx, ytd, st, avatarColors) {
 
   var ytdBox = app(cel('div', 'text-right'),
     ctxt('div', 'text-xs text-slate-400', 'YTD Commission'),
-    ctxt('div', 'font-bold text-slate-800 text-sm', ytd === null ? '—' : fmt(ytd)));
+    ctxt('div', 'font-bold text-slate-800 text-sm', ytd === null ? '—' : fmtMoney(ytd, currencySymbolFor(profileForSE(se)))));
 
   app(header,
     app(cel('div', 'flex items-center gap-3'), avatar, infoEl),
@@ -3718,7 +3732,7 @@ function buildSeCard(se, idx, ytd, st, avatarColors) {
     barOuter.appendChild(barInner);
 
     var commEl = ctxt('div', 'text-xs text-slate-400',
-      isPending ? '—' : (!ctx ? '—' : (qComm > 0 ? fmt(qComm) + ' earned' : 'No payout')));
+      isPending ? '—' : (!ctx ? '—' : (qComm > 0 ? fmtMoney(qComm, currencySymbolFor(profileForSE(se))) + ' earned' : 'No payout')));
 
     app(strip, stripHdr, barOuter, commEl);
     grid.appendChild(strip);
