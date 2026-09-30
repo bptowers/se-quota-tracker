@@ -2,3 +2,10 @@
 .firebase/
 .playwright-mcp/
 node_modules/
+
+# Local reference docs (comp plans, org chart, rosters — contain pay/personal data)
+docs/*.pdf
+docs/*.xlsx
+docs/*.csv
+docs/SE Attainment Tracker.docx
+docs/Someone Has To Own The Agent After The Walkth.docx
