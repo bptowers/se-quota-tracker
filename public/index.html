@@ -877,6 +877,21 @@ function loadAdminProfilesOnce(callback) {
   });
 }
 
+// True when the IC picker is on the signed-in admin's own record. Matched by
+// login email (names can collide or be overwritten), falling back to name
+// only when the picked person has no live profile loaded yet.
+function adminViewingOwnProfile() {
+  if (!currentUserIsAdmin()) return true;
+  var picker = document.getElementById('icSE');
+  var selectedName = picker && picker.value;
+  if (!selectedName || !profile) return false;
+  var selectedProfile = findAdminCompProfile(selectedName);
+  if (selectedProfile && selectedProfile.email) {
+    return String(selectedProfile.email).toLowerCase() === String(currentUser.email).toLowerCase();
+  }
+  return normalizedPersonName(selectedName) === normalizedPersonName(profile.displayName);
+}
+
 // Resolve the selected IC before loading pools or recalculating. A missing
 // profile must never fall back to the signed-in admin's compensation details.
 function syncSelectedCompProfile() {
@@ -887,7 +902,7 @@ function syncSelectedCompProfile() {
   }
   var picker = document.getElementById('icSE');
   var selectedName = picker && picker.value;
-  if (!selectedName || (profile && normalizedPersonName(selectedName) === normalizedPersonName(profile.displayName))) {
+  if (!selectedName || adminViewingOwnProfile()) {
     _commOteOverride = null;
     _compProfileOverride = null;
     return;
@@ -1517,9 +1532,8 @@ function loadPool(callback) {
 // edits are display-only and never overwrite the stored profile.
 function scheduleSave() {
   if (currentUserIsAdmin()) {
-    // Allow saves only when the admin has their own name selected in the IC picker.
-    var se = document.getElementById('icSE');
-    if (!se || se.value !== (profile && profile.displayName)) return;
+    // Allow saves only when the admin has their own record selected in the IC picker.
+    if (!adminViewingOwnProfile()) return;
   }
   clearTimeout(saveTimer);
   document.getElementById('saveInd').textContent = 'Saving…';
@@ -1536,6 +1550,9 @@ function scheduleSave() {
 }
 
 function resetProfile() {
+  // Reset always targets the signed-in user's own profile — never allow it
+  // while an admin is previewing someone else.
+  if (!adminViewingOwnProfile()) return;
   if (!confirm('This will clear your region, OTE, and quotas so you can re-enter them. Continue?')) return;
   profile.onboarded = false;
   if (currentUser && currentUser.firebaseUid) {
@@ -1571,7 +1588,7 @@ function buildDashboard() {
   document.getElementById('seQuota').disabled = true;
   document.getElementById('fxRate').disabled  = true;
   var btnRP = document.getElementById('btnResetProfile');
-  if (btnRP) btnRP.classList.toggle('hidden', !(isICView() && currentUserIsAdmin()));
+  if (btnRP) btnRP.classList.toggle('hidden', !(isICView() && currentUserIsAdmin() && adminViewingOwnProfile()));
 
   // Monthly quota reference uses the same authoritative source as the headline.
   var ref = document.getElementById('quotaRef');
