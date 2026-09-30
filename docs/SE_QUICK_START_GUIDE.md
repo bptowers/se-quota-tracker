@@ -39,7 +39,7 @@ The first time you sign in, a short setup wizard appears.
 - **Regions you support** — tick one or more (most SEs tick just one). This tells the app which team's Closed Won counts toward your attainment.
 
 **Step 2 — Your comp plan**
-- **Annual OTE** — your on-target earnings for the year, from your comp plan.
+- **Annual total OTE** — your total on-target cash earnings for the year (base plus variable), used to derive the 30% commission target.
 - **Quarterly quotas (Q1–Q4)** — your targets in USD, straight from your signed comp plan. Some regions pre-fill standard quotas — just check they're right.
 
 **Step 3 — Launch**
@@ -59,7 +59,7 @@ The first time you sign in, a short setup wizard appears.
 
 - **Top bar** — your headline tiles for the selected month: attainment to quota, estimated commission, your region's Closed Won, and days remaining.
 - **Month selector** (top right) — switch months to see past or current performance.
-- **Quota Progress bar** — how your team's revenue is tracking toward the regional quota.
+- **Quota Progress bar** — how your region's Closed Won is tracking against your personal monthly quota.
 - **2026 Monthly Attainment chart** — one bar per month with your attainment %, so you can see your trend across the year.
 - **Commission Earned This Month** — your estimated payout for the month, with a projection of where you'll land.
 - **Quarterly Summary** (right side) — your quarter so far and the projected quarterly commission.
@@ -74,11 +74,10 @@ The first time you sign in, a short setup wizard appears.
 
 You don't need to do any math — the app does it — but here's the gist:
 
-- You're measured on your **region's Closed Won** against **your quota**. Everyone on a regional team shares the same attainment %.
-- **Months 1 & 2:** you get an estimated **draw**, capped at 100% — so you're never overpaid early.
-- **Month 3:** a **true-up** settles the full quarter and can pay above target if you had a strong quarter.
-- You earn **from the first dollar**, and commission is **capped at 200%** of your target.
-- **No clawbacks** — if the quarter comes in light, you keep what you've already been paid.
+- You're measured on your **region's Closed Won** against **your personal quota**. Teammates share the same regional Closed Won pool, but their attainment can differ if their personal quotas differ.
+- Each month is calculated independently using that month's Closed Won, monthly quota, and monthly commission target.
+- You earn **from the first dollar**, and the monthly estimate is **capped at 200%** of your monthly commission target.
+- The amount shown is an estimate for planning; Finance certifies the final commission.
 
 ### Getting paid
 
@@ -87,9 +86,9 @@ Commission is paid after each month closes:
 | Region | When |
 | --- | --- |
 | ANZ | +45 days after month-end |
-| UK, US & BigChange | +30 days after month-end |
+| UK, US, BigChange & ClockShark | +30 days after month-end |
 
-Deals that close right at quarter-end are first paid in the following true-up.
+The KPI subtitle states both periods explicitly—for example, **"Earned in June 2026 · Expected July 2026 payment."** Payment timing follows the selected employee's payroll/home region, not every revenue region included in their commission scope. ANZ follows its longer, approximately 45-day schedule.
 
 > **📷 Screenshot: The "Getting Paid" card in the sidebar**
 >
@@ -109,7 +108,7 @@ Want to see what a certain amount of Closed Won would pay you? Use the **Scenari
 
 ## 6. Update your comp plan
 
-Your OTE and quotas aren't locked in. In the **Comp Plan** panel on the left of your dashboard you can update your **Annual OTE** or **quarterly quotas** at any time — changes save automatically. To start over, use **Reset Profile / Re-run Setup**.
+Your OTE and quotas aren't locked in. In the **Comp Plan** panel on the left of your dashboard you can update your **Annual Total OTE** or **quarterly quotas** at any time — changes save automatically. To start over, use **Reset Profile / Re-run Setup**.
 
 > **📷 Screenshot: The Comp Plan panel (left sidebar)**
 >
@@ -119,8 +118,8 @@ Your OTE and quotas aren't locked in. In the **Comp Plan** panel on the left of 
 
 ## Quick FAQ
 
-**Why is my attainment the same as my teammates'?**
-Commission is based on your whole region's Closed Won, not individual deals — so every SE in a region shares the same attainment %.
+**Why might my attainment differ from a teammate's?**
+Commission uses the same regional Closed Won pool for both of you, but each SE's personal monthly quota is authoritative. If the quotas differ, the attainment percentages differ.
 
 **Where do the numbers come from?**
 Closed Won is pulled automatically from the company data warehouse every night. You don't enter any deal data yourself.

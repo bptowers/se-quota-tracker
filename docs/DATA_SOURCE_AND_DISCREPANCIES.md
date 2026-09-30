@@ -203,7 +203,7 @@ The app operates exclusively on a **monthly grain**, not quarterly or annual:
 
 - One Firestore doc per region per **month**
 - All quota calculations are for a monthly period (quota ÷ 3 from quarterly entries)
-- Commission is earned monthly, not drawn quarterly
+- Commission is earned and estimated independently each month
 - The month selector (Jan–Dec 2026) drives all views
 
 **Why this matters for discrepancies:**

@@ -31,10 +31,10 @@ The SE Attainment Tracker is a real-time attainment and commission tracking tool
 **Key features:**
 - Real-time Closed Won data synced nightly from BigQuery
 - Monthly attainment tracking against team and personal quotas
-- Quarterly draw model commission calculation (draws months 1–2, true-up in month 3)
+- Monthly commission estimates based on each month's attainment
 - Personal dashboard for each SE with commission projections
 - Admin tools for team oversight, quota management, and payroll audits
-- Full-year commission breakdown report showing what every SE should be paid
+- Full-year commission breakdown report showing the app's month-by-month estimate for each SE; Finance certifies actual payments
 
 **Who can access what:**
 - **Sales Engineers (ICs):** My Dashboard only — your own region's attainment and commission
@@ -50,65 +50,50 @@ The SE Attainment Tracker is a real-time attainment and commission tracking tool
 
 ## Key Concepts & Commission Model
 
-### 1. The Quarterly Draw Model
+### 1. Monthly Commission Model
 
-The SE compensation plan uses a **quarterly draw model** with draws on estimated attainment followed by a true-up in the third month.
+The tracker estimates each month's commission independently from that month's regional Closed Won, the selected SE's personal monthly quota, and monthly commission target. Regional quotas are used only for team and leader rollups.
 
-#### How It Works
+**Formula:**
+```
+Monthly Attainment = Monthly Closed Won ÷ Monthly Quota
+Estimated [Earning Month] Commission = min(Monthly Attainment, 200%) × Monthly Commission Target
+```
 
-**Month 1 (Estimated Draw):**
-- Calculates an estimated commission based on Month 1 Closed Won only
-- Capped at 100% of the monthly commission target
-- Formula: `min(Month1_CW ÷ (Quarterly_Quota ÷ 3), 100%) × (Quarterly_OTE ÷ 3)`
-
-**Month 2 (Estimated Draw):**
-- Recalculates commission based on Quarter-To-Date (Jan + Feb) Closed Won
-- Still capped at 100% of the cumulative two-month target
-- Month 2 payout = cumulative draw minus what was already paid in Month 1
-- Formula: `max(0, min(QTD2_CW ÷ (Quarterly_Quota × 2/3), 100%) × (Quarterly_OTE × 2/3)) - Month1_Draw`
-
-**Month 3 (True-up):**
-- Final quarterly commission calculated from full-quarter Closed Won
-- Attainment capped at 200% (the OTE cap)
-- Month 3 payout = full quarterly commission minus Months 1 & 2 draws already paid
-- Formula: `max(0, min(QTD3_CW ÷ Quarterly_Quota, 200%) × Quarterly_OTE - Month1_Draw - Month2_Draw)`
-
-#### Why This Matters
-
-- **Months 1–2:** You see estimated commission with a draw cap — you're never overpaid early
-- **Month 3:** The true-up settles the full quarter and can go above monthly OTE if the quarter was strong
-- **No clawbacks:** If actual CW is lower than expected, you keep what you've drawn (no negative true-up)
+Commission starts with the first dollar of attainment and is capped at 200% of the monthly commission target. The figure remains an estimate until Finance certifies it.
 
 ### 2. Individual vs. Team Attainment
 
-**Team Attainment (what appears on your dashboard):**
-- Calculated at the **region level**, not individual SE level
-- Formula: `Region Closed Won (USD) ÷ Region Quota`
-- Every SE in a region has the **same attainment percentage**
-- This is because commission is based on team performance, not individual deal ownership
+**IC attainment (what appears on an SE dashboard):**
+- Uses the selected SE's **regional Closed Won pool** as the numerator
+- Uses that SE's **personal monthly quota** as the denominator
+- Formula: `Region Closed Won (USD) ÷ SE Personal Monthly Quota`
+- SEs in the same region share the Closed Won numerator, but their attainment percentages can differ if their personal quotas differ
+
+**Team and leader rollups:**
+- Use the same regional Closed Won data against the admin-managed **regional monthly quota**
+- These rollups are operational views and do not replace the selected SE's personal quota in IC commission calculations
 
 **Region CW Pool:**
 - Combines Closed Won from all AEs (Account Executives) in that region
 - AE names and Closed Won amounts come from BigQuery
 - Updated nightly via Cloud Function sync
 
-### 3. Commission Capping & Floors
+### 3. Commission Start & Cap
 
-**No floor:** Commission starts at the first dollar of attainment. 25% attainment pays 25% of OTE.
+**No floor:** Commission starts at the first dollar of attainment. Under the current app model, 25% attainment estimates 25% of the monthly commission target.
 
-**200% OTE cap:** Commission maxes out at 2× your OTE (quarterly cap). Attainment above 200% doesn't increase pay.
-- Example: If your quarterly OTE is $2,250 and you hit 250% attainment, you earn $4,500 (capped), not $5,625
+**200% commission-target cap:** Monthly commission maxes out at 2× the monthly commission target. Attainment above 200% does not increase the monthly estimate.
+- Example: If the monthly commission target is $900 and monthly attainment is 250%, the estimate is $1,800, not $2,250.
 
 ### 4. OTE (On-Target Earnings)
 
-**Annual OTE:** Your full-year commission target if you hit 100% quota every quarter. Set once during onboarding.
+**Annual Total OTE:** Your total annual on-target cash earnings (base plus variable). Set once during onboarding.
 
-**Monthly OTE:** Calculated automatically as `Annual OTE × 30% ÷ 12`
+**Monthly Commission Target:** Calculated automatically as `Annual Total OTE × 30% ÷ 12`
 - The 30% represents the commission-eligible portion (rest is base salary)
 - Used as the multiplier for monthly commission payout
-- Example: Annual OTE $36,000 → Monthly OTE = $36,000 × 0.30 ÷ 12 = $900/month
-
-**Quarterly OTE:** `Monthly OTE × 3` (used in the quarterly draw calculation)
+- Example: Annual Total OTE $36,000 → Monthly Commission Target = $36,000 × 0.30 ÷ 12 = $900/month
 
 ### 5. Quota Structure
 
@@ -120,19 +105,9 @@ The SE compensation plan uses a **quarterly draw model** with draws on estimated
 - Distributes the quarterly target evenly across 3 months
 - Used for monthly attainment % calculation
 
-### 6. Personal Commission Rate (PCR)
+### 6. Monthly Commission Rate
 
-The compensation plan defines PCR as:
-```
-PCR = Quarterly Commission Target ÷ Quarterly Quota
-```
-
-This is baked into the quarterly draw model. The app calculates quarterly commission as:
-```
-Quarterly Commission = min(Quarterly Attainment, 200%) × Quarterly OTE
-```
-
-Which is equivalent to the PCR approach since `Quarterly OTE = Quarterly Commission Target`.
+The tracker applies the same monthly attainment percentage to the monthly commission target, capped at 200%. Quarterly and annual summaries are the sum of the monthly estimates in those periods.
 
 ---
 
@@ -262,7 +237,7 @@ regionPools/{regionKey}_{YYYY-MM} docs written to Firestore
     ↓
 App loads regionPools on dashboard init
     ↓
-User views attainment % and draws are calculated locally
+User views attainment % and monthly commission estimates are calculated locally
 ```
 
 **Manual refresh:** Admins can click "Sync Now" to trigger immediate sync
@@ -315,11 +290,12 @@ You'll be guided through a one-time setup:
   - Admins can view any region; ICs see their own region(s) only
 
 **Step 2: Compensation Plan**
-- **Annual OTE:** Your full-year commission target (e.g., $36,000)
-  - Stored as-is; Monthly OTE calculated as Annual × 0.30 ÷ 12
+- **Annual Total OTE:** Your total on-target cash earnings (base plus variable; e.g., $36,000)
+  - Stored as-is; Monthly Commission Target is calculated as Annual Total OTE × 0.30 ÷ 12
   - You can edit this anytime; changes save automatically
 - **Quarterly Quotas (Q1–Q4):** Your region's revenue targets in USD
-  - Stored per SE, but admins can also set region-level quotas (which take priority)
+  - Stored per SE and used as the authoritative quota for that SE's dashboard, charts, scenarios, and history
+  - Region-level quotas remain available for team and leader rollups
   - Monthly quota auto-calculated as Quarterly ÷ 3
 
 **Step 3: Launch Dashboard**
@@ -355,9 +331,9 @@ A reference card in the left sidebar showing when commission is paid after each 
 | Region | Payment timing |
 | --- | --- |
 | ANZ | +45 days after month-end |
-| UK, US & BigChange | +30 days after month-end |
+| UK, US, BigChange & ClockShark | +30 days after month-end |
 
-These are the standard payout lags; a deal closing at quarter-end is first paid in the following true-up.
+These are indicative payout lags based on the employee's payroll/home region—not every revenue region included in their commission scope. Finance certifies the final amount and payroll date.
 
 ### Top Bar KPIs
 
@@ -365,18 +341,18 @@ These are the standard payout lags; a deal closing at quarter-end is first paid 
 >
 > *Paste your screenshot here, then delete this placeholder line.*
 
-#### 1. Commission to Quota (Attainment %)
+#### 1. Attainment to Quota
 
-**What it shows:** Your region's attainment percentage for the selected month.
+**What it shows:** Your selected SE attainment percentage for the selected month, using regional Closed Won against that SE's personal quota.
 
 **How it's calculated:**
 ```
-Attainment % = Region Closed Won (USD) ÷ Region Monthly Quota × 100
+Attainment % = Region Closed Won (USD) ÷ SE Personal Monthly Quota × 100
 ```
 
 **Example:**
 - Region CW this month: $45,000
-- Region monthly quota: $50,000
+- SE personal monthly quota: $50,000
 - Attainment: 45,000 ÷ 50,000 = 90%
 
 **Color coding:**
@@ -385,23 +361,22 @@ Attainment % = Region Closed Won (USD) ÷ Region Monthly Quota × 100
 - ⚪ Gray (<80%): Building
 - 🟣 Purple (200%+): Capped
 
-**Subtitle:** Shows "$X earned of $Y quota" (your region's CW and quota for the month)
+**Subtitle:** Shows "$X earned of $Y quota" (regional CW and the selected SE's personal quota for the month)
 
-#### 2. Commission ($)
+#### 2. Estimated [Earning Month] Commission
 
 **What it shows:** Your estimated commission payout for the selected month.
 
-**How it's calculated:** Uses the quarterly draw model (see [Calculations & Formulas](#calculations--formulas))
+**How it's calculated:** Uses the selected month's Closed Won and monthly quota (see [Calculations & Formulas](#calculations--formulas)).
 
-**Labels:**
-- **"Est. Draw"** (months 1–2 of quarter): Commission is capped at 100% of the monthly target
-- **"Quarter True-up"** (month 3): Commission reflects the full quarter and may exceed monthly OTE
+**Label:** The heading names the earning month. The subtitle states both periods explicitly—for example, **"Earned in June 2026 · Expected July 2026 payment."** Payment timing follows the selected employee's payroll/home region.
 
 **Example:**
-- Monthly OTE: $900
-- Month 1 attainment: 80% (capped draw = $900 × 0.80 × cap = $720)
-- Month 2 attainment (QTD): 85% (incremental draw: approx $400 more)
-- Month 3 attainment (full quarter): 95% (true-up pays final adjustment to hit quarterly commission)
+- Monthly Commission Target: $900
+- July attainment: 80%
+- Estimated July commission: $900 × 0.80 = $720
+- Expected payment month for UK, US, BigChange, and ClockShark: August
+- ANZ: expected about 45 days after month-end
 
 #### 3. Net Topline
 
@@ -424,18 +399,18 @@ Region Net Topline = SUM(all AE Closed Won for the month)
 
 ### Left Sidebar — Comp Plan Panel
 
-#### Annual OTE
+#### Annual Total OTE
 - Editable text field
-- Your full-year commission target
+- Your total annual on-target cash earnings (base plus variable)
 - Automatically saved to your Firestore profile when you change it
 
-#### Monthly OTE (Read-only)
-- Auto-calculated as `Annual OTE × 0.30 ÷ 12`
+#### Monthly Commission Target (Read-only)
+- Auto-calculated as `Annual Total OTE × 0.30 ÷ 12`
 - The commission multiplier for monthly calculations
 
 #### Monthly Quota (Read-only)
 - Current month's quota target
-- Sourced from regionConfig (admin-set) or your personal quotas (if no region quota)
+- Sourced from your selected SE profile in IC views; team and leader rollups use regionConfig
 - Calculated as Quarterly Quota ÷ 3
 
 #### Monthly Quotas 2026 (Collapsible sidebar)
@@ -465,7 +440,7 @@ Region Net Topline = SUM(all AE Closed Won for the month)
 
 **How it's calculated:**
 ```
-Bar width % = min(Region CW ÷ Region Monthly Quota, 100%) × 100
+Bar width % = min(Region CW ÷ SE Personal Monthly Quota, 100%) × 100
 ```
 
 **Markers:**
@@ -499,11 +474,11 @@ Bar width % = min(Region CW ÷ Region Monthly Quota, 100%) × 100
 - Region CW for that month
 - Monthly quota
 - Attainment %
-- Commission earned (using draw model for month 1/2, true-up for month 3)
+- Estimated monthly commission
 
 **How it's built:**
 1. Load all 12 months of region CW data from regionPools
-2. For each month, calculate attainment % and draw amount
+2. For each month, calculate attainment % and monthly commission
 3. Plot attainment as bar height, color by status
 
 ---
@@ -541,22 +516,22 @@ Bar width % = min(Region CW ÷ Region Monthly Quota, 100%) × 100
 
 **Metric 1: Progress bar**
 ```
-Bar width % = Commission Earned ÷ Monthly OTE × 100
+Bar width % = Commission Earned ÷ Monthly Commission Target × 100
 ```
-- Fills green as commission accumulates toward your monthly OTE
+- Fills green as commission accumulates toward your monthly commission target
 - Capped at 100% (never exceeds 100% visual width)
 
 **Metric 2: Earned amount ($)**
 - Your commission payout for the selected month
-- Calculated via quarterly draw model
+- Calculated independently from that month's attainment
 
 **Metric 3: If you maintain current pace**
 - Projected end-of-month commission if attainment holds steady
-- Formula: `Current Attainment % × Monthly OTE`
+- Formula: `Current Attainment % × Monthly Commission Target`
 
 **Metric 4: If you hit 100% quota**
 - Commission if region hits exactly 100% attainment
-- Formula: `1.0 × Monthly OTE` = `Monthly OTE`
+- Formula: `1.0 × Monthly Commission Target` = `Monthly Commission Target`
 
 ---
 
@@ -573,7 +548,7 @@ Bar width % = Commission Earned ÷ Monthly OTE × 100
   - Total Closed Won (sum of 3 months)
   - Quarterly quota (from user profile)
   - Attainment % = QTD CW ÷ Quarterly Quota
-  - Commission = `min(Attainment %, 200%) × Quarterly OTE`
+  - Commission = sum of the monthly commission estimates in the quarter
 
 **For future quarters:**
 - Shows "Pending" in gray (no data yet)
@@ -585,11 +560,7 @@ Bar width % = Commission Earned ÷ Monthly OTE × 100
 
 **How quarterly commission is calculated:**
 ```
-Quarterly Commission = min(Quarterly_CW ÷ Quarterly_Quota, 200%) × Quarterly_OTE
-
-Where:
-  Quarterly_CW = Sum of 3 months CW in the quarter
-  Quarterly_OTE = Monthly OTE × 3
+Quarterly Commission = Month 1 Commission + Month 2 Commission + Month 3 Commission
 ```
 
 ---
@@ -609,15 +580,15 @@ Where:
 
 **1. This month:**
 - Attainment % at your projected CW
-- Commission earned using draw model
+- Estimated monthly commission
 
 **2. This quarter:**
-- Combines previous months' actual commission + projected current month draw
+- Combines the monthly commission estimates within the selected quarter
 - Shows total quarterly commission to date
 
 **3. Annual run-rate:**
 - Projects full-year commission assuming every month matches the attainment % you enter
-- Formula: `Projected Attainment % × Annual OTE`
+- Formula: `Projected Attainment % × Annual Commission Target`, capped monthly at 200%
 
 **Use case:** Explore how much CW you need to hit $X commission, or what you'd earn if you over/under-performed.
 
@@ -630,7 +601,7 @@ Where:
 **Milestones:**
 - 50% Quota
 - 80% Quota
-- 100% Quota (full pay)
+- 100% Quota (monthly commission target)
 - 150% Quota (stretch)
 - 200% Quota (capped)
 
@@ -644,7 +615,7 @@ Where:
 For each milestone:
   Target CW = (Milestone % ÷ 100) × Monthly Quota
   CW Gap = max(0, Target CW - Current Month CW)
-  Commission at Milestone = min(Milestone %, 200%) × Monthly OTE
+  Commission at Milestone = min(Milestone %, 200%) × Monthly Commission Target
 ```
 
 ---
@@ -705,7 +676,7 @@ A RevOps-focused board at the very top of Team View that answers *"where will we
 1. If region quotas are empty, auto-seeds from all SE personal quotas (averaged or summed)
 2. Admin edits quarterly targets
 3. Clicks **Save** to persist to Firestore `regionConfig`
-4. Dashboard attainment % recalculates immediately
+4. Team and leader rollup attainment recalculates immediately; IC calculations continue to use each selected SE's personal quota
 
 **Stored in:** Firestore `regionConfig/{regionKey}`
 
@@ -749,9 +720,9 @@ Region Attainment % = Region CW ÷ Region Quota × 100
 **Table showing each SE:**
 - **Name**
 - **Title** (e.g., "Senior Sales Engineer")
-- **Monthly OTE** (calculated from their annualOTE)
-- **Attainment %** (shared with all SEs in the region)
-- **Est. Commission** (using draw model for selected month)
+- **Monthly Commission Target** (calculated from their annual total OTE)
+- **Attainment %** (regional Closed Won divided by that SE's personal monthly quota)
+- **Est. Commission** (using that SE-specific monthly attainment)
 
 **Note:** SEs without OTE set show "—"
 
@@ -838,7 +809,7 @@ Region Attainment % = Region CW ÷ Region Quota × 100
 **Hover tooltip:**
 - SE name
 - Attainment % for that month
-- Commission earned (draw model)
+- Estimated monthly commission
 
 ---
 
@@ -897,8 +868,8 @@ Region Attainment % = Region CW ÷ Region Quota × 100
 **How commission is calculated:**
 
 For each quarter:
-1. Sum the 3 monthly draw amounts using quarterly draw model
-2. `Quarterly Commission = min(Quarterly_CW ÷ Quarterly_Quota, 200%) × Quarterly_OTE`
+1. Calculate each elapsed month's commission independently
+2. Sum the monthly commissions in that quarter
 
 **Data display:**
 - Shows `—` for future quarters (no data yet)
@@ -911,26 +882,25 @@ For each quarter:
 
 **Columns:**
 - **Month**: Calendar month (e.g., "Jan 2026")
-- **Type**: "Est. Draw" or "True-up" (indicates draw model phase)
-- **Commission**: Dollar amount (using quarterly draw model)
+- **Basis**: "Monthly estimate"
+- **Commission**: Estimated dollar amount for that month
 - **Region CW**: Actual Closed Won from that SE's region that month
 - **Attainment %**: Attainment for that month
 
 **Row styling:**
-- Draw months (1–2): Amber background to indicate estimate
-- True-up month (3): Green background to indicate final settlement
+- Monthly estimates use consistent blue styling
 
 **Quarterly subtotal rows:**
 - Inserted between quarters
 - Shows Q1 Total, Q2 Total, etc.
-- Sums the 3 monthly draws for that quarter
+- Sums the monthly commissions for that quarter
 
 **Only shows elapsed months** (no future months)
 
 **How data is sourced:**
 1. Load regionPools docs for SE's region × all months
 2. Look up SE's profile (OTE, quotas) from Firestore users collection
-3. For each month, call `quarterlyDrawForSE(month, regionCW, seQuotas, seMonthlyOTE)`
+3. For each month, call `monthlyCommissionForSE(month, regionCW, seQuotas, seMonthlyOTE)`
 4. Render table with results
 
 ---
@@ -943,19 +913,21 @@ This section documents every calculation used in the app, including source data 
 
 **Formula:**
 ```
-Attainment % = Region Closed Won ÷ Region Quota
+IC Attainment % = Region Closed Won ÷ SE Personal Monthly Quota
+Team/Leader Rollup Attainment % = Region Closed Won ÷ Region Monthly Quota
 ```
 
 **Data sources:**
 - **Region Closed Won**: `regionPools/{regionKey}_{YYYY-MM}.totalCwUSD` (from BigQuery via nightly sync)
-- **Region Quota**: `regionConfig/{regionKey}.quotas['Q' + Math.ceil(month/3)]` ÷ 3 for monthly quota
-  - Falls back to `DEFAULT_REGION_QUOTAS` if not set by admin
+- **IC quota**: selected SE profile `users/{userId}.quotas['Q' + Math.ceil(month/3)]` ÷ 3
+- **Team/leader rollup quota**: `regionConfig/{regionKey}.quotas['Q' + Math.ceil(month/3)]` ÷ 3
+  - Falls back to `DEFAULT_REGION_QUOTAS` for regional rollups if not set by admin
 
 **Example:**
 - Region: UK
 - Month: June 2026 (Q2)
 - regionPools.UK_2026-06.totalCwUSD = $145,000
-- regionConfig.UK.quotas.Q2 = $180,000 (monthly = $60,000)
+- Selected SE profile quota Q2 = $180,000 (monthly = $60,000)
 - Attainment = $145,000 ÷ $60,000 = 2.42 (242%)
 
 **Rounding:** Displayed as percentage with 2 decimal places (242.33%)
@@ -964,105 +936,62 @@ Attainment % = Region Closed Won ÷ Region Quota
 
 ---
 
-### 2. Quarterly Draw Commission (Monthly Breakdown)
+### 2. Monthly Commission
 
-**Function:** `quarterlyDrawForSE(month, regionMonthlyData, seQuotas, seMonthlyOTE)`
+**Function:** `monthlyCommissionForSE(month, regionMonthlyData, seQuotas, seMonthlyOTE)`
 
 **Inputs:**
 - `month`: String like "2026-01"
 - `regionMonthlyData`: Object `{ '2026-01': cw_amount, '2026-02': cw_amount, ... }`
 - `seQuotas`: Object `{ Q1: quota, Q2: quota, Q3: quota, Q4: quota }`
-- `seMonthlyOTE`: Number (SE's annual OTE × 0.30 ÷ 12)
+- `seMonthlyOTE`: Number (legacy variable name; value is the SE's annual total OTE × 0.30 ÷ 12)
 
-**Step 1: Determine quarter and position within quarter**
+**Step 1: Determine the applicable quarterly quota**
 ```
 monthNumber = parseInt(month.slice(5), 10)  // e.g., "2026-06" → 6
 quarterNumber = Math.ceil(monthNumber / 3)  // 6 → Q2
-monthInQuarter = ((monthNumber - 1) % 3) + 1  // 6 → month 3 of quarter
+quarterlyQuota = seQuotas['Q' + quarterNumber]
 ```
 
-**Step 2: Get quarterly targets**
+**Step 2: Convert the quarterly quota to a monthly quota**
 ```
-quarterlyQuota = seQuotas['Q' + quarterNumber]  // e.g., Q2 quota
-quarterlyOTE = seMonthlyOTE × 3  // e.g., $900 → $2,700
 monthlyQuota = quarterlyQuota ÷ 3
 ```
 
-**Step 3: Gather month Closed Won**
+**Step 3: Calculate the selected month's attainment and commission**
 ```
-month1CW = regionMonthlyData[quarterStart]  // First month of quarter
-month2CW = regionMonthlyData[quarterStart + 1 month]
-month3CW = regionMonthlyData[quarterStart + 2 months]
-```
-
-**Step 4: Calculate draw based on which month**
-
-#### Month 1 (Est. Draw)
-```
-month1Draw = min(month1CW ÷ monthlyQuota, 1.0) × (quarterlyOTE ÷ 3)
-
-Example:
-  monthlyQuota = $60k
-  month1CW = $45k
-  attainment = 45k ÷ 60k = 0.75 (75%)
-  draw = min(0.75, 1.0) × $900 = $675
-```
-
-#### Month 2 (Est. Draw)
-```
-qtd2CW = month1CW + month2CW
-cumulative2Draw = min(qtd2CW ÷ (monthlyQuota × 2), 1.0) × (quarterlyOTE × 2/3)
-month2Draw = max(0, cumulative2Draw - month1Draw)
-
-Example:
-  qtd2CW = $45k + $48k = $93k
-  cumulative2Draw = min($93k ÷ $120k, 1.0) × $1,800
-                  = min(0.775, 1.0) × $1,800 = $1,395
-  month2Draw = $1,395 - $675 = $720
-```
-
-#### Month 3 (True-up)
-```
-qtd3CW = month1CW + month2CW + month3CW
-quarterlyAttainment = min(qtd3CW ÷ quarterlyQuota, 2.0)  // Cap at 200%
-quarterlyCommission = quarterlyAttainment × quarterlyOTE
-month3Draw = max(0, quarterlyCommission - month1Draw - month2Draw)
-
-Example:
-  qtd3CW = $45k + $48k + $42k = $135k
-  quarterlyAttainment = min($135k ÷ $180k, 2.0) = 0.75
-  quarterlyCommission = 0.75 × $2,700 = $2,025
-  month3Draw = $2,025 - $675 - $720 = $630
-  (True-up happens to be positive; if attainment dropped, it could be $0 or negative, but we don't claw back)
-```
-
-**Return value:**
-```
-{
-  pay: $draw_amount,      // Dollar amount to pay
-  att: quarterly_attainment,  // For display (e.g., 75%)
-  isDraw: (monthInQuarter < 3) // Boolean: true if draw, false if true-up
-}
-```
-
----
-
-### 3. Monthly OTE
-
-**Formula:**
-```
-Monthly OTE = Annual OTE × 30% ÷ 12
-```
-
-**Simplifies to:**
-```
-Monthly OTE = Annual OTE × 0.025
+monthCW = regionMonthlyData[month]
+monthlyAttainment = monthCW ÷ monthlyQuota
+estimatedCommission = min(monthlyAttainment, 2.0) × seMonthlyOTE
 ```
 
 **Example:**
 ```
-Annual OTE = $36,000
-Monthly OTE = $36,000 × 0.30 ÷ 12 = $900
+monthlyQuota = $60,000
+monthCW = $45,000
+monthlyAttainment = $45,000 ÷ $60,000 = 75%
+seMonthlyOTE = $900
+estimatedCommission = 75% × $900 = $675
+```
+
+---
+
+### 3. Monthly Commission Target
+
+**Formula:**
+```
+Monthly Commission Target = Annual Total OTE × 30% ÷ 12
+```
+
+**Simplifies to:**
+```
+Monthly Commission Target = Annual Total OTE × 0.025
+```
+
+**Example:**
+```
+Annual Total OTE = $36,000
+Monthly Commission Target = $36,000 × 0.30 ÷ 12 = $900
 ```
 
 **Data source:** Firestore users collection, `profile.annualOTE`
@@ -1071,20 +1000,20 @@ Monthly OTE = $36,000 × 0.30 ÷ 12 = $900
 
 ---
 
-### 4. Quarterly OTE
+### 4. Quarterly Commission Target
 
 **Formula:**
 ```
-Quarterly OTE = Monthly OTE × 3
+Quarterly Commission Target = Monthly Commission Target × 3
 ```
 
 **Example:**
 ```
-Monthly OTE = $900
-Quarterly OTE = $900 × 3 = $2,700
+Monthly Commission Target = $900
+Quarterly Commission Target = $900 × 3 = $2,700
 ```
 
-**Used in:** Quarterly draw commission calculations
+**Used in:** Quarterly and annual reference totals
 
 ---
 
@@ -1102,26 +1031,25 @@ Jun Monthly Quota = $180,000 ÷ 3 = $60,000
 ```
 
 **Data sources:**
-1. **Region quota** (if set by admin): `regionConfig/{regionKey}.quotas['Q' + quarterNumber]`
-2. **SE personal quota** (fallback): `profile.quotas['Q' + quarterNumber]`
-3. **Default quota** (if neither set): `DEFAULT_REGION_QUOTAS`
+1. **IC dashboard, charts, scenarios, history, and commission:** selected SE profile `profile.quotas['Q' + quarterNumber]`
+2. **Team/leader regional rollups:** `regionConfig/{regionKey}.quotas['Q' + quarterNumber]`
+3. **Regional rollup default only:** `DEFAULT_REGION_QUOTAS` when no admin-managed regional quota is set
 
 ---
 
-### 6. Quarterly Commission (from Quarter's Closed Won)
+### 6. Quarterly Commission Summary
 
 **Formula:**
 ```
-Quarterly Commission = min(Quarterly CW ÷ Quarterly Quota, 200%) × Quarterly OTE
+Quarterly Commission = Month 1 Commission + Month 2 Commission + Month 3 Commission
 ```
 
 **Example:**
 ```
-Q2 CW = $135,000
-Q2 Quota = $180,000
-Attainment = 135k ÷ 180k = 75%
-Q2 OTE = $2,700
-Q2 Commission = min(0.75, 2.0) × $2,700 = $2,025
+April Commission = $675
+May Commission = $720
+June Commission = $630
+Q2 Commission = $675 + $720 + $630 = $2,025
 ```
 
 **Used in:** Quarterly Summary card, Commission Breakdown report (for "All SEs" summary table)
@@ -1136,17 +1064,17 @@ YTD Commission = SUM(Commission for all elapsed months)
 ```
 
 **How it's calculated:**
-- For each elapsed month, calculate monthly commission using quarterly draw model
+- For each elapsed month, calculate that month's commission independently
 - Sum the results from January through the current month
 
 **Example (end of June 2026):**
 ```
-Jan commission (draw):   $675
-Feb commission (draw):   $720
-Mar commission (true-up): $630
-Apr commission (draw):   $710
-May commission (draw):   $725
-Jun commission (true-up): $645
+Jan commission: $675
+Feb commission: $720
+Mar commission: $630
+Apr commission: $710
+May commission: $725
+Jun commission: $645
 YTD = $675 + $720 + $630 + $710 + $725 + $645 = $4,105
 ```
 
@@ -1214,7 +1142,7 @@ Months at Quota = 23
 
 **Formula:**
 ```
-Projected Commission = min(Projected Attainment %, 200%) × Monthly OTE
+Projected Commission = min(Projected Attainment %, 200%) × Monthly Commission Target
 
 Where:
 Projected Attainment % = (Projected CW entered by user) ÷ Monthly Quota
@@ -1225,7 +1153,7 @@ Projected Attainment % = (Projected CW entered by user) ÷ Monthly Quota
 User enters: "Projected CW = $65,000"
 Monthly Quota = $60,000
 Projected Attainment = $65,000 ÷ $60,000 = 108.33% (capped at 200% = 108.33% actual)
-Monthly OTE = $900
+Monthly Commission Target = $900
 Projected Commission = 1.0833 × $900 = $975
 ```
 
@@ -1235,14 +1163,14 @@ Projected Commission = 1.0833 × $900 = $975
 
 **Formula:**
 ```
-Projected Quarterly Commission = (Sum of prior months' commission) + (Projected current month using draw model)
+Projected Quarterly Commission = Sum of monthly commission estimates in the selected quarter
 ```
 
 **Example (for month 2 of quarter):**
 ```
-Month 1 draw: $675 (already earned)
+Month 1 commission: $675
 Projected Month 2 CW: $50,000
-Month 2 draw using quarterlyDrawForMonth: $720
+Projected Month 2 commission: $720
 Projected Q2 Commission so far = $675 + $720 = $1,395
 ```
 
@@ -1252,9 +1180,10 @@ Projected Q2 Commission so far = $675 + $720 = $1,395
 
 **Formula:**
 ```
-Projected Annual = (Projected Attainment % for current month) × Annual OTE
+Projected Annual Commission = (Projected Attainment % for current month) × Annual Commission Target
 
 Where the current month's attainment % is extrapolated for all 12 months
+Annual Commission Target = Annual Total OTE × 30%
 ```
 
 **Example:**
@@ -1262,10 +1191,11 @@ Where the current month's attainment % is extrapolated for all 12 months
 User projects Month 6 CW = $65,000
 Monthly Quota = $60,000
 Month 6 Attainment = 108.33%
-Annual OTE = $36,000
+Annual Total OTE = $36,000
+Annual Commission Target = $10,800
 If every month matched 108.33% attainment:
-Annual Commission = min(1.0833, 2.0) × $36,000 = $38,988
-(This exceeds OTE because attainment >100%, but capped at 200%)
+Annual Commission = min(1.0833, 2.0) × $10,800 = $11,700
+(The monthly calculation is capped at 200% of each month's commission target.)
 ```
 
 ---
@@ -1326,7 +1256,7 @@ A: BigQuery data syncs nightly at 2 AM UTC. If you need fresh data immediately:
 **Q: I see different attainment % on my dashboard vs. Team View. Why?**
 
 A: Two possibilities:
-1. **Different quotas:** Your personal dashboard uses your personal quotas (set during onboarding), while Team View uses the region's centralized quota (set by admin). The admin quota takes priority for region-level attainment.
+1. **Different quotas:** Your personal dashboard uses your personal quotas (set during onboarding), while Team View's regional cards use the region's centralized quota (set by admin). Neither replaces the other: personal quota is authoritative for IC calculations; regional quota is authoritative for regional rollups.
 2. **Different months:** Make sure both views have the same month selected (top-right month picker).
 
 **Q: My AE pool is empty. Where's the data?**
@@ -1338,41 +1268,28 @@ A: Check:
 
 **Q: Commission shows "—" for an SE. Why?**
 
-A: The SE doesn't have an OTE or quotas set. They must complete onboarding (enter Annual OTE and quarterly quotas) before commission can be calculated.
+A: The SE doesn't have an OTE or quotas set. They must complete onboarding (enter Annual Total OTE and quarterly quotas) before commission can be calculated.
 
 ---
 
 ### Commission & Calculations
 
-**Q: Why is my Month 2 commission lower than Month 1?**
+**Q: Why is one month's commission lower than another?**
 
-A: Month 2 commission is incremental. The formula is:
-```
-Month 2 Draw = Cumulative (Months 1+2) Draw - Month 1 Draw
-```
-
-If cumulative attainment is lower than expected, the incremental draw is smaller.
-
-**Example:**
-- Month 1: $45k CW (75% of monthly quota) → $675 draw
-- Month 2: $35k CW (58% of monthly quota) → QTD = $80k of $120k target (67%) → $1,200 cumulative cap → incremental = $1,200 - $675 = $525 (lower)
-
-**Q: Why can Month 3 commission be negative or zero?**
-
-A: If quarter-to-date CW falls short of projections, the true-up may be small or zero. However, you never lose money—negative payouts are floored at $0 (no clawback).
+A: Each month is calculated independently. A month with lower Closed Won or lower attainment produces a lower monthly commission estimate.
 
 **Q: What does "Capped at 200%" mean?**
 
-A: Commission maxes out at 2× your OTE. If you hit 250% attainment, you still earn only 200% OTE:
+A: Monthly commission maxes out at 2× the monthly commission target. If you hit 250% monthly attainment, the estimate is limited to 200%:
 ```
-Quarterly Commission = min(250%, 200%) × Quarterly OTE = 200% × OTE
+Monthly Commission = min(250%, 200%) × Monthly Commission Target
 ```
 
 **Q: How is the 30% commission-eligible portion calculated?**
 
 A: It's baked into the OTE formula:
 ```
-Monthly OTE = Annual OTE × 0.30 ÷ 12
+Monthly Commission Target = Annual Total OTE × 0.30 ÷ 12
 ```
 
 The 30% (or 0.30) factor assumes 30% of your total comp is commission-eligible, and 70% is base salary.
@@ -1392,11 +1309,11 @@ A: In Team View (admins only):
 2. Scroll to the "Regional Quotas" section at the top
 3. Edit Q1–Q4 for each region
 4. Click "Save"
-5. All attainment % calculations immediately recalculate using the new quotas
+5. Regional Team View rollups immediately recalculate using the new quotas; IC dashboards continue to use each SE's personal quota
 
 **Q: What's the difference between personal quotas and region quotas?**
 
-A: **Personal quotas** are set by each SE during onboarding. **Region quotas** are set by admin in Team View. The app uses region quotas for attainment calculations (they take priority). Personal quotas are for reference and SE context.
+A: **Personal quotas** are set by each SE during onboarding and are authoritative for that SE's IC dashboard, charts, scenarios, history, and commission estimates. **Region quotas** are set by admin in Team View and are authoritative only for team and leader regional rollups.
 
 **Q: Can I view another SE's dashboard?**
 
@@ -1446,7 +1363,7 @@ A: This means Firestore couldn't reach the regionPools doc for that region/month
 
 A: Use the **2026 Commission Breakdown** card in the Report tab (admins only):
 1. Select the SE from the "2026 Commission Breakdown" dropdown
-2. Review the month-by-month commission with labels (Est. Draw vs. True-up)
+2. Review the month-by-month monthly commission estimates
 3. Verify attainment % and region CW match expectations
 4. Check that quarterly subtotals align with the Quarterly Summary card
 
@@ -1456,13 +1373,11 @@ A: Use the **2026 Commission Breakdown** card in the Report tab (admins only):
 
 - **AE (Account Executive):** Deal owner in Salesforce. Their Closed Won is tracked and attributed to a region. Not the same as an SE.
 
-- **Attainment:** Region Closed Won divided by Region Quota, expressed as a percentage. E.g., 85% attainment means the region hit 85% of its target.
+- **Attainment:** For an IC, regional Closed Won divided by the selected SE's personal monthly quota. For a team/leader regional rollup, regional Closed Won divided by the regional monthly quota.
 
 - **Closed Won (CW):** Revenue from deals won in a given month. Measured in Monthly Recurring Revenue (MRR) in USD. Source: BigQuery.
 
 - **CRR (?) — Not used in this app.**
-
-- **Draw (Quarterly Draw):** Estimated commission payout in months 1–2 of a quarter, capped at 100% of the monthly OTE. Settled in month 3 via true-up.
 
 - **Firestore:** Google Cloud's NoSQL database. Stores SE profiles (OTE, quotas), region quotas, and synced Closed Won pools.
 
@@ -1470,19 +1385,19 @@ A: Use the **2026 Commission Breakdown** card in the Report tab (admins only):
 
 - **MRR (Monthly Recurring Revenue):** Monthly revenue from a customer contract. The app uses MRR (not ACV or ARR) for all Closed Won amounts.
 
-- **OTE (On-Target Earnings):** Compensation target if you hit 100% quota. Divided into Annual OTE (yearly) and Monthly OTE (yearly ÷ 12). Also called "quota commission" or "target commission."
+- **Annual Total OTE:** Total annual on-target cash earnings (base plus variable). The app's current 70/30 model derives the annual commission target as 30% of this amount.
+
+- **Monthly Commission Target:** Annual Total OTE × 30% ÷ 12. This is the monthly multiplier at 100% attainment.
 
 - **Quota:** Revenue target for a region or SE. Set quarterly; monthly quota = quarterly quota ÷ 3.
 
-- **Region:** One of 5 operational areas: Simpro UK, BigChange UK, Simpro North America, Simpro ANZ, ClockShark North America. SEs are assigned to a region, and commission is based on that region's attainment.
+- **Region:** One of 5 operational areas: Simpro UK, BigChange UK, Simpro North America, Simpro ANZ, ClockShark North America. SEs are assigned to a region; their commission uses that region's Closed Won pool against their own personal monthly quota.
 
 - **regionConfig:** Firestore collection storing admin-set region quotas. One doc per region key (UK, BigChange, etc.).
 
 - **regionPools:** Firestore collection storing synced BigQuery Closed Won data. One doc per region per month (e.g., UK_2026-06). Contains AE list and total CW.
 
-- **SE (Sales Engineer):** Technical presales role. Carries their region's team attainment number for commission purposes.
-
-- **True-up (Month 3):** Final settlement commission calculated from full quarterly Closed Won. May exceed monthly OTE if quarter was strong; never results in clawback if quarter was weak.
+- **SE (Sales Engineer):** Technical presales role. Uses the regional Closed Won pool with their own personal monthly quota for commission purposes.
 
 - **users:** Firestore collection storing SE profiles (email, region, OTE, quotas, onboarded status). One doc per SE.
 
@@ -1509,5 +1424,5 @@ A: Use the **2026 Commission Breakdown** card in the Report tab (admins only):
 
 ---
 
-**Last Updated:** July 1, 2026
-**App Version:** 1.3+ (Quarterly Draw Model, Commission Breakdown Report)
+**Last Updated:** July 27, 2026
+**App Version:** 1.4+ (Monthly Commission Model, Commission Breakdown Report)

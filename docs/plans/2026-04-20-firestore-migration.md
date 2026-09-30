@@ -348,8 +348,8 @@ function buildAdminView() {
         var res     = payout(poolUSD, quota, ote);
         var attPct  = (res.att * 100).toFixed(1);
         var badge   = res.att >= 1   ? ['bg-green-100 text-green-700', 'Quota Hit \u2713']
-                    : res.att >= 0.6 ? ['bg-amber-100 text-amber-700', 'Qualified \u2713']
-                    :                  ['bg-red-100 text-red-700',      'Below Floor'];
+                    : res.att >= 0.8 ? ['bg-blue-100 text-blue-700',   'On Track']
+                    :                  ['bg-slate-100 text-slate-600',  'Building'];
 
         var card = cel('div', 'bg-white rounded-xl shadow-sm border border-slate-200 p-4');
 

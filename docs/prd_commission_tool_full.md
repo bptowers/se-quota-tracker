@@ -24,10 +24,11 @@ The tool is built on a **Regional Team Number** model using **Monthly Recurring 
 
 ### **2.2 Commission Payout Math (The "Brain")**
 
-* **The 60% Floor:** If a regional team/product line does not hit at least 60% of their monthly MRR target, no commissions are earned.  
-* **Base Tier (60% \- 100%):** Commissions scale linearly based on attainment once the floor is crossed.  
-* **Accelerators (100%+):** Multipliers apply to every dollar of MRR over 100% attainment.  
-* **Technical Win Guardrail:** A deal must be marked "Closed-Won" AND have a "Completed" Technical Win in the data warehouse to count toward "Booked" payouts.
+* **No Attainment Floor:** Commission begins with the first dollar of eligible monthly Closed Won.
+* **Linear Monthly Estimate:** Estimated commission scales linearly with raw monthly attainment.
+* **Current App Cap:** Monthly attainment used for commission is capped at 200%. No separate accelerator multiplier is implemented in the approved app model.
+* **Monthly in Arrears:** Each earning month is estimated independently and expected to be paid after month-end according to regional timing.
+* **Eligibility Verification Boundary:** The current BigQuery sync filters for eligible Closed Won records. Any additional Technical Win requirement must be confirmed and implemented in the warehouse query before the tracker can claim to enforce it.
 
 ## **3\. Data Architecture (BigQuery)**
 
@@ -40,7 +41,7 @@ The tool utilizes a **Data Warehouse-centric architecture**, pulling cleaned dat
 | dim\_users | Identity & Comp Plan | user\_id, region\_id, product\_line, individual\_target |
 | fact\_opportunities | Live Deal Data | opportunity\_id, amount\_mrr, stage, technical\_win\_status |
 | fact\_team\_targets | Monthly Quotas | region\_id, product\_line, target\_month, mrr\_quota |
-| dim\_comp\_rules | Payout Logic | floor\_threshold (0.60), accelerator\_multiplier |
+| dim\_comp\_rules | Payout Logic | commission\_start (0.00), attainment\_cap (2.00) |
 
 ## **4\. Technical Architecture**
 
@@ -66,7 +67,7 @@ The interface is a **Three-Panel Motivation Engine**.
 
 1. **Top Header:** Displays current User Region, assigned Product Line, and "Last Synced" timestamp.  
 2. **Left Sidebar (Gauges):**  
-   * **Attainment Gauge:** Visual semi-circle with a red marker at the **60% Floor**.  
+   * **Attainment Gauge:** Monthly attainment from 0%, with visible status bands and a 100% quota marker.
    * **Earnings Gauge:** "Booked" (Confirmed) vs. "Forecasted" (What-If) payouts.  
 3. **Main Workspace (Deal Ledger):**  
    * List of all regional deals for the month.  
@@ -83,7 +84,7 @@ A sticky footer that appears when pipeline deals are selected, showing the real-
 
 * Establish Firebase environment and SSO integration.  
 * Build BigQuery views for the four regions and three product lines.  
-* Implement the 60% floor logic and "What-If" simulator.
+* Implement the no-floor linear monthly calculation, 200% cap, and "What-If" simulator.
 
 ### **Phase 2: Automation & Expansion**
 
