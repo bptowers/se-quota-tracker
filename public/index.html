@@ -141,7 +141,10 @@
           <input type="checkbox" class="obRegionCheckbox" value="ClockShark" /> ClockShark
         </label>
       </div>
-      <button onclick="obNext(1)" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 transition-all">Next →</button>
+      <div class="flex gap-3">
+        <button id="obCancel" onclick="obCancel()" class="flex-1 border border-slate-200 text-slate-600 font-medium rounded-xl py-3 hover:bg-slate-50 transition-all hidden">Cancel</button>
+        <button onclick="obNext(1)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 transition-all">Next →</button>
+      </div>
     </div>
 
     <!-- Step 2 -->
@@ -1382,7 +1385,12 @@ function obNext(step) {
     var sym = symMap[primaryRegion] || '$';
     document.getElementById('obSym').textContent = sym;
     document.getElementById('obSym2').textContent = sym;
-    if (primaryRegion === 'UK' || primaryRegion === 'BigChange') {
+    // Region defaults only fill an empty form — never overwrite quotas the SE
+    // already has (re-running setup pre-fills their current values).
+    var hasQuotas = ['obQ1','obQ2','obQ3','obQ4'].some(function(id) { return document.getElementById(id).value !== ''; });
+    if (hasQuotas) {
+      // keep what's there
+    } else if (primaryRegion === 'UK' || primaryRegion === 'BigChange') {
       document.getElementById('obQ1').value = 175008;
       document.getElementById('obQ2').value = 226150;
       document.getElementById('obQ3').value = 288083;
@@ -1435,7 +1443,8 @@ function obFinish() {
   var q2 = parseFloat(document.getElementById('obQ2').value) || 0;
   var q3 = parseFloat(document.getElementById('obQ3').value) || 0;
   var q4 = parseFloat(document.getElementById('obQ4').value) || 0;
-  profile = {
+  // Merge over the existing profile so re-running setup keeps any other fields.
+  profile = Object.assign({}, rerunningSetup ? profile : {}, {
     uid: currentUser.uid,
     email: currentUser.email,
     displayName: document.getElementById('obName').value.trim(),
@@ -1447,7 +1456,9 @@ function obFinish() {
     quotas: { Q1: q1, Q2: q2, Q3: q3, Q4: q4 },
     onboarded: true,
     isAdmin: currentUserIsAdmin()
-  };
+  });
+  rerunningSetup = false;
+  document.getElementById('obCancel').classList.add('hidden');
   document.getElementById('qSel').value = currentQuarterKey();
   if (currentUser.firebaseUid) {
     profile.firebaseUid = currentUser.firebaseUid;
@@ -1561,18 +1572,43 @@ function scheduleSave() {
   }, 800);
 }
 
+// True while an onboarded SE is re-running setup from the dashboard. Nothing is
+// saved until they finish, so cancelling (or closing the tab) leaves their
+// existing profile untouched.
+var rerunningSetup = false;
+
+function showObStep(n) {
+  [1, 2, 3].forEach(function(i) {
+    document.getElementById('obS' + i).classList.toggle('hidden', i !== n);
+  });
+  document.getElementById('obStep').textContent = String(n);
+}
+
 function resetProfile() {
   // Reset always targets the signed-in user's own profile — never allow it
   // while an admin is previewing someone else.
-  if (!adminViewingOwnProfile()) return;
-  if (!confirm('This will clear your region, OTE, and quotas so you can re-enter them. Continue?')) return;
-  profile.onboarded = false;
-  if (currentUser && currentUser.firebaseUid) {
-    fsSetProfile(currentUser.firebaseUid, profile).then(function() { showPage('pgOnboard'); });
-  } else {
-    setProfile(currentUser.uid, profile);
-    showPage('pgOnboard');
-  }
+  if (!adminViewingOwnProfile() || !profile) return;
+  rerunningSetup = true;
+  var regions = regionsOf(profile);
+  document.getElementById('obName').value = profile.displayName || (currentUser && currentUser.name) || '';
+  document.querySelectorAll('.obRegionCheckbox').forEach(function(el) {
+    el.checked = regions.indexOf(el.value) !== -1;
+  });
+  document.getElementById('obOTE').value = profile.annualOTE || '';
+  var quotas = profile.quotas || {};
+  ['Q1', 'Q2', 'Q3', 'Q4'].forEach(function(k) {
+    document.getElementById('ob' + k).value = quotas[k] != null ? quotas[k] : '';
+  });
+  document.getElementById('obCancel').classList.remove('hidden');
+  showObStep(1);
+  showPage('pgOnboard');
+}
+
+function obCancel() {
+  rerunningSetup = false;
+  document.getElementById('obCancel').classList.add('hidden');
+  showObStep(1);
+  showPage('pgApp');
 }
 
 // ── DASHBOARD ──────────────────────────────────────────
@@ -1600,7 +1636,7 @@ function buildDashboard() {
   document.getElementById('seQuota').disabled = true;
   document.getElementById('fxRate').disabled  = true;
   var btnRP = document.getElementById('btnResetProfile');
-  if (btnRP) btnRP.classList.toggle('hidden', !(isICView() && currentUserIsAdmin() && adminViewingOwnProfile()));
+  if (btnRP) btnRP.classList.toggle('hidden', !(isICView() && adminViewingOwnProfile()));
 
   // Monthly quota reference uses the same authoritative source as the headline.
   var ref = document.getElementById('quotaRef');
